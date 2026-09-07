@@ -1,0 +1,28 @@
+docs/ASHARE_FULLMARKET_SCAN.md
+  s_e83a5402cf255a::t_6033e7be398fbc 1-50
+run_local_ashare.sh
+  s_e83a5402cf255a::t_7fdebeeeea233d 1-39
+ashare_daily.sh
+  s_e83a5402cf255a::t_b58f921f454f46 1-19
+scripts/scan_ashare.py
+  s_e83a5402cf255a::t_23ec1952b18482 61,67
+  s_e83a5402cf255a::t_af07932f89f743 44
+  s_e83a5402cf255a::t_6a220a724e6d7a 1-23,30-32,34-36,46-60,62-66,68-113
+  s_e83a5402cf255a::t_96aa8b0a4f4aaa 24-29,33,37-43,45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.43-trip",
+  "base_commit_sha": "ca75e6a5242a64ba098d7fb02065db0e92cd3001",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
