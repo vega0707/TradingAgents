@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 import urllib.request
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -42,11 +43,18 @@ def is_etf(ticker: str) -> bool:
     return len(ticker) == 6 and ticker[0] in "15"
 
 
-def _http_json(url: str, timeout: int = 10) -> object:
+def _http_json(url: str, timeout: int = 10, retries: int = 3) -> object:
     req = urllib.request.Request(url, headers={"User-Agent": _UA,
                                                "Referer": "https://finance.sina.com.cn"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8", "replace"))
+    last_err: Exception | None = None
+    for attempt in range(retries):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode("utf-8", "replace"))
+        except Exception as e:  # noqa: BLE001 — 新浪偶发断连/频控，退避重试
+            last_err = e
+            time.sleep(1.5 * (attempt + 1))
+    raise RuntimeError(f"http fetch failed after {retries} tries: {url} :: {last_err}")
 
 
 def fetch_daily_kline(ticker: str, days: int = 260) -> list[dict]:
