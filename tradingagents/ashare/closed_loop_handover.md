@@ -33,7 +33,7 @@
   - views（每大师一条）：`{master, signal(bullish|neutral|bearish|abstain), conviction 0-100, thesis, risks, price_view}`（`team.py` run_masters）
   - manager：`{recommendation(买入|增持|持有|减持|卖出|不评级), confidence 0-100, rationale, plan, watchlist}`（`team.py` _MANAGER_SYS）
   - trader：`{action(加仓|持有|减仓|清仓|建仓|观望|止损), reasoning, levels, stop_loss, position_note}`（`team.py` _TRADER_SYS）
-- 材料包 `material.py`：行情用新浪日 K（不复权，只取 ≤ as_of，防未来泄漏）；基本面跨仓复用 ai-hedge-fund 的 PIT 快照（`AkshareDataClient` + `build_snapshot`，披露日过滤）。`Material` 有 `ticker/name/as_of/is_etf/mark/fundamentals_ok`。ETF/基本面缺失 → 大师可 abstain，交易员仍出动作。
+- 材料包 `material.py`：行情用新浪日 K（不复权，只取 ≤ as_of，防未来泄漏）；基本面用**本仓 vendor 的 PIT 快照**（`tradingagents.ashare.data.AkshareDataClient` + `tradingagents.ashare.snapshot.build_snapshot`，披露日过滤；数据层源出 ai-hedge-fund `hedge_fund.data`，2026-09-08 已独立解耦 vendor 进本仓，无跨仓 sys.path 依赖）。`Material` 有 `ticker/name/as_of/is_etf/mark/fundamentals_ok`。ETF/基本面缺失 → 大师可 abstain，交易员仍出动作。
 - LLM 出入口 `llmio.py`：quick/deep 两档模型；JSON 解析失败一次重试后抛 `LLMCallError`。
 
 当前缺口（本次要补的）：

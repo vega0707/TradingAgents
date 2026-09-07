@@ -1,30 +1,20 @@
 """material.py — A 股单票的「材料包」：让每个角色看到同一份事实，谁也不许编。
 
 数据来源（全部免费、本机已验证可达）：
-- 基本面：复用 ai-hedge-fund 的 point-in-time 快照（AkshareDataClient +
-  build_snapshot，含披露日 PIT 过滤），与既有每日决策卡同源。
+- 基本面：本仓 vendor 的 point-in-time 快照（data.AkshareDataClient +
+  snapshot.build_snapshot，含披露日 PIT 过滤），源出 ai-hedge-fund hedge_fund.data，
+  已独立解耦（见 data/__init__.py 与 closed_loop_handover.md）。
 - 行情/技术面：新浪日 K JSON（https://quotes.sina.cn/cn/api/json_v2.php/...）
   直连，只取 as_of 当日及之前的收盘（防未来泄漏）。
-
-跨仓导入 hedge_fund：开发期通过 ASHARE_HEDGE_FUND_REPO 指到 ai-hedge-fund
-仓库（sys.path 注入）。部署到腾讯云时该仓库即同机代码，或 vendor 成自包含。
 """
 
 from __future__ import annotations
 
 import json
-import os
-import sys
 import time
 import urllib.request
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-
-_HEDGE_FUND_REPO = os.environ.get(
-    "ASHARE_HEDGE_FUND_REPO", "/Users/vega/git/ai-hedge-fund"
-)
-if _HEDGE_FUND_REPO and _HEDGE_FUND_REPO not in sys.path:
-    sys.path.insert(0, _HEDGE_FUND_REPO)
 
 _SINA_KLINE_URL = (
     "https://quotes.sina.cn/cn/api/json_v2.php/CN_MarketDataService.getKLineData"
@@ -170,8 +160,8 @@ def build_material(ticker: str, as_of: str, name: str = "") -> Material:
     fundamentals, ok = "", False
     if not etf:
         try:
-            from hedge_fund.data import AkshareDataClient
-            from hedge_fund.features.snapshot import build_snapshot as bs
+            from tradingagents.ashare.data import AkshareDataClient
+            from tradingagents.ashare.snapshot import build_snapshot as bs
             snap = bs(ticker, as_of, AkshareDataClient())
             fundamentals = snap.render()
             ok = True
