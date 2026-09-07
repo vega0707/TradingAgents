@@ -7,10 +7,10 @@ DATE=$(date +%Y-%m-%d)
 LOG=logs/ashare-${DATE}.log
 mkdir -p logs
 KEY=/Users/vega/git/steel/servers/tx.pem
-TEN="ssh -i $KEY ubuntu@124.221.95.205"
+TEN_HOST="ubuntu@124.221.95.205"
 
 # 1. 同步腾讯云权威持仓到本地
-"$TEN" "cat ~/ai-hedge-fund/config/tickers.yaml" > /Users/vega/git/ai-hedge-fund/config/tickers.yaml 2>/dev/null
+ssh -i "$KEY" "$TEN_HOST" "cat ~/ai-hedge-fund/config/tickers.yaml" > /Users/vega/git/ai-hedge-fund/config/tickers.yaml 2>>"$LOG"
 echo "[$DATE] tickers 已同步 $(date +%H:%M)" >> "$LOG"
 
 # 2. 跑分析（.env 已配 ADA Coding Plan）
@@ -29,7 +29,7 @@ cp /tmp/ashare-card.md "logs/card-${DATE}.md"
 # 4. 推送：scp 卡片到服务器，服务器 openclaw 发原群
 if [[ -s /tmp/ashare-card.md ]]; then
   scp -i "$KEY" -q /tmp/ashare-card.md ubuntu@124.221.95.205:/tmp/ashare-card.md 2>>"$LOG"
-  "$TEN" "cd /home/ubuntu/TradingAgents && set -a && source .env && set +a && \
+  ssh -i "$KEY" ubuntu@124.221.95.205 "cd /home/ubuntu/TradingAgents && set -a && source .env && set +a && \
     BIN=\$HOME/.local/share/pnpm/global/5/.pnpm/openclaw@2026.7.1-2/node_modules/openclaw/dist/index.js && \
     NODE=\$HOME/.nvm/versions/node/v22.23.2/bin/node && \
     \$NODE \$BIN message send --channel feishu --account \"\$FEISHU_ACCOUNT\" --target \"\$FEISHU_TARGET\" -m \"\$(cat /tmp/ashare-card.md)\"" >>"$LOG" 2>&1 \
