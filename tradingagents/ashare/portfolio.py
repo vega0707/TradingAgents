@@ -234,37 +234,59 @@ def build_portfolio(holdings, signals, as_of: str) -> dict:
 
 
 def render(port: dict, capital: float = 1_000_000) -> str:
+    """调仓单渲染：目标 vs 实际占比差额 → 动作 + 规则理由。"""
     if "error" in port:
         return f"组合层：{port['error']}"
     as_of = port["as_of"]
-    risk = "✅ 大盘多头（沪深300 > MA200）" if port["risk_on"] else "⚠️ 大盘破 MA200 → 总仓位 ×0.5"
+    risk = "✅ 大盘多头（沪深300 > MA200）满仓" if port["risk_on"] else "⚠️ 大盘破 MA200 → 总仓位 ×0.5"
+    stats, w, pool = port["stats"], port["w"], port["pool"]
+
+    # 实际占比（基于当前持仓市值）；目标是池内归一权重（结构再平衡，与总资金无关）
+    equity = sum(s["shares"] * (s["mark"] or 0) for s in stats.values() if s["mark"])
     lines = [
-        f"# A股组合方案 · {as_of}", "",
-        f"{risk} ｜ 沪深300 {port['hs300']:.0f}",
-        f"入池 {len(port['pool'])} 只｜总仓位系数 {port['total_scale']:.2f}",
-        "", "| 股票 | 信号 | 现价 | σ(年化) | 目标权重 | 目标市值 | 建议 |",
+        f"# 持仓调仓单 · {as_of}", "",
+        f"{risk} ｜ 股票市值 {equity/10000:.2f}万 ｜ 目标=低波加权结构（池内归一）",
+        "",
+        "| 股票 | 信号 | 现价 | 目标% | 实际% | 差额 | 动作 |",
         "|---|---|---|---|---|---|---|",
     ]
-    stats, w, pool = port["stats"], port["w"], port["pool"]
+    actions = []
     for c in sorted(pool, key=lambda x: -w[x]):
         s = stats[c]
-        mark = s["mark"] or s["cost"] or 0
-        target_mv = capital * port["total_scale"] * w[c]
-        cur_mv = s["shares"] * (s["mark"] or s["cost"] or 0)
-        factor = s["factor"]
-        if factor == 0:
-            advice = "清仓"
-        elif factor < 1:
-            advice = "减仓"
-        elif s["shares"] == 0:
-            advice = "建仓"
-        else:
-            advice = "持有"
-        act = s["signal"] or "-"
+        mark = s["mark"] or 0
+        target_pct = w[c] * 100
+        cur_mv = s["shares"] * mark
+        actual_pct = cur_mv / equity * 100 if equity else 0
+        diff = target_pct - actual_pct
+        advice = "持有"
+        if s["factor"] <= 0:
+            advice = "🔴清仓"
+        elif diff > 4:
+            advice = "🟢加买"
+        elif diff < -4:
+            advice = "🟡减卖"
         lines.append(
-            f"| {s['name']} {c} | {act} | {mark:.2f} | {s['sigma']*100:.0f}% | "
-            f"{w[c]*100:.1f}% | {target_mv/10000:.1f}万 | {advice} |"
+            f"| {s['name']} {c} | {s['signal'] or '-'} | {mark:.2f} | "
+            f"{target_pct:.1f}% | {actual_pct:.1f}% | {diff:+.1f}pp | {advice} |"
         )
+        if advice in ("🟢加买", "🟡减卖", "🔴清仓"):
+            actions.append((advice, s["name"], c, diff, s["signal"] or "组合"))
+    actions.sort(key=lambda x: -abs(x[3]))
+
+    # 调仓单：只列需要动的
+    if actions:
+        lines += ["", "## 今日调仓建议（结构差额 >4pp 才动，减少过度交易）"]
+        for advice, name, c, diff, why in actions:
+            est = abs(diff) / 100 * equity / 10000  # 万
+            if advice == "🔴清仓":
+                lines.append(f"- **{name} {c}**：清仓（信号 {why}）")
+            elif advice == "🟢加买":
+                lines.append(f"- **{name} {c}**：加买 ~{est:.1f}万（现低配 {diff:+.0f}pp；低波加权目标）")
+            else:
+                lines.append(f"- **{name} {c}**：减 ~{est:.1f}万（现超配 {diff:+.0f}pp；信号 {why}）")
+    else:
+        lines += ["", "## 今日调仓建议", "无超阈值动作——结构已在低波加权目标附近，无需操作"]
+
     lines += [
         "", "## 组合指标（样本内，历史回放）",
         f"- 年化收益 {port['ann_ret']*100:.1f}% ｜ 年化波动 {port['ann_vol']*100:.1f}%",

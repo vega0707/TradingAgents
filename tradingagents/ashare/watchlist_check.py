@@ -17,7 +17,7 @@ import yaml
 from tradingagents.ashare.material import fetch_daily_kline
 
 WL = Path(__file__).resolve().parents[2] / "config" / "watchlist.yaml"
-DIP = 0.92  # 与回测一致：MA60 乖离 -8%
+DIP = 0.88  # 乖离 -12%（广度回测 35 只最优档：持20日 +5.3% 胜 77%）
 STATE = Path(__file__).resolve().parents[2] / "ashare_out" / "_cache" / "watchlist_state.json"
 
 
