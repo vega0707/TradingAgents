@@ -1,0 +1,19 @@
+run_local_ashare.sh
+  s_e83a5402cf255a::t_28c9e012340955 54-56,60-76,78,84,91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.43-trip",
+  "base_commit_sha": "189ad20e8cd4a83ab48a3d757d304582e57e7833",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
