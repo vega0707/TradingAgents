@@ -103,8 +103,8 @@ def _kline_cached(symbol: str, days: int) -> list[dict]:
     if not isinstance(rows, list) or not rows:
         raise RuntimeError(f"sina kline empty for {symbol}")
     out = [
-        {"date": r["day"], "close": float(r["close"]), "high": float(r["high"]),
-         "low": float(r["low"]), "volume": float(r["volume"])}
+        {"date": r["day"], "open": float(r["open"]), "close": float(r["close"]),
+         "high": float(r["high"]), "low": float(r["low"]), "volume": float(r["volume"])}
         for r in rows
     ]
     _cache_save("kline", f"{symbol}-{days}", out)
