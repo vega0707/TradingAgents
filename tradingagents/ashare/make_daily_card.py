@@ -4,6 +4,10 @@
 名称/现价/研经裁决/交易员动作/关键位与理由摘要。
 用法:
   python -m tradingagents.ashare.make_daily_card <date> [out.md]
+  python -m tradingagents.ashare.make_daily_card --signals <date>   # 只打调仓信号
+
+信号规则：trader.action 命中 {加仓,减仓,清仓,建仓,止损} 才视为需要推送；
+全为 持有/观望（无操作）时 --signals 输出为空 → 调用方可跳过飞书推送。
 """
 from __future__ import annotations
 
@@ -12,6 +16,54 @@ import sys
 from pathlib import Path
 
 OUT_ROOT = Path("ashare_out")
+
+# 有实际调仓含义、值得推送的动作；持有/观望不在其中（用户不看无变化日报）。
+SIGNAL_ACTIONS = {"加仓", "减仓", "清仓", "建仓", "止损"}
+
+
+def _code_and_date(dirname: str) -> tuple[str, str]:
+    """'000651-2026-09-08' → ('000651', '2026-09-08')。
+
+    目录名 = <code>-YYYY-MM-DD，日期定长 10；不能 rsplit('-')（code 后缀与
+    日期都含连字符，rsplit 一次会把 '2026-09' 误并进 code）。
+    """
+    return dirname[:-11], dirname[-10:]
+
+
+def load_records(as_of: str | None = None) -> list[tuple[str, str, dict, dict]]:
+    """返回 [(code, as_of, record, decision)]；as_of 省略时取全部 record 目录。"""
+    if as_of:
+        pairs = [
+            (_code_and_date(p.name)[0], as_of)
+            for p in sorted(OUT_ROOT.glob(f"*-{as_of}"))
+        ]
+    else:
+        pairs = [
+            _code_and_date(p.parent.name)
+            for p in sorted(OUT_ROOT.glob("*/record.json"))
+        ]
+    out = []
+    for code, d in pairs:
+        rec_p = OUT_ROOT / f"{code}-{d}" / "record.json"
+        if not rec_p.exists():
+            continue
+        dec_p = OUT_ROOT / f"{code}-{d}" / "decision.json"
+        out.append((
+            code, d,
+            json.loads(rec_p.read_text(encoding="utf-8")),
+            json.loads(dec_p.read_text(encoding="utf-8")) if dec_p.exists() else {},
+        ))
+    return out
+
+
+def action_signals(as_of: str | None = None) -> list[str]:
+    """有调仓信号的行（"名称 代码: 动作"）；全持有/观望返回空列表。"""
+    out = []
+    for code, _d, rec, _dec in load_records(as_of):
+        act = (rec.get("trader") or {}).get("action", "")
+        if act in SIGNAL_ACTIONS:
+            out.append(f"{rec.get('name') or code} {code}: {act}")
+    return out
 
 
 def one_card(code: str, as_of: str) -> str:
@@ -38,22 +90,26 @@ def one_card(code: str, as_of: str) -> str:
 
 
 def main() -> None:
-    as_of = sys.argv[1] if len(sys.argv) > 1 else None
-    out_path = sys.argv[2] if len(sys.argv) > 2 else None
-    dirs = sorted(OUT_ROOT.glob(f"*-{as_of}")) if as_of else sorted(OUT_ROOT.glob("*/record.json"))
-    if as_of:
-        items = [(p.name.rsplit("-", 1)[0], as_of) for p in dirs]
+    args = sys.argv[1:]
+    if args and args[0] == "--signals":
+        as_of = args[1] if len(args) > 1 else None
+        for s in action_signals(as_of):
+            print(s)
+        return
+
+    as_of = args[0] if args else None
+    out_path = args[1] if len(args) > 1 else None
+    items = load_records(as_of)
+    if not items:
+        md = "# A股持仓决策日报 · 无记录\n"
     else:
-        items = []
-        for p in dirs:
-            code, d = p.parent.name.rsplit("-", 1)
-            items.append((code, d))
-    codes = items
-    lines = [f"# A股持仓决策日报 · {as_of or ('多日混合 ' + str(len(set(d for _, d in items))))}", "",
-             f"共 {len(codes)} 只｜双跑观察（与 hedge-fund 共识并存，暂不改仓位）", ""]
-    for code, d in codes:
-        lines.append(one_card(code, d))
-    md = "\n".join(lines)
+        dates = sorted({d for _, d, *_ in items})
+        title = as_of or ("多日混合 " + ",".join(dates))
+        lines = [f"# A股持仓决策日报 · {title}", "",
+                 f"共 {len(items)} 只｜双跑观察（与 hedge-fund 共识并存，暂不改仓位）", ""]
+        for code, d, _rec, _dec in items:
+            lines.append(one_card(code, d))
+        md = "\n".join(lines)
     if out_path:
         Path(out_path).write_text(md, encoding="utf-8")
         print(f"写 {out_path} ({len(md)} 字符)")
