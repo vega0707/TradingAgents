@@ -234,65 +234,68 @@ def build_portfolio(holdings, signals, as_of: str) -> dict:
 
 
 def render(port: dict, capital: float = 1_000_000) -> str:
-    """调仓单渲染：目标 vs 实际占比差额 → 动作 + 规则理由。"""
+    """持仓状态与建议（2026-09-08 起废弃精确目标权重——回测证明池内
+    低波加权无优势；只保留三类有用输出：大盘开关/信号动作/风险提示）。"""
     if "error" in port:
         return f"组合层：{port['error']}"
     as_of = port["as_of"]
-    risk = "✅ 大盘多头（沪深300 > MA200）满仓" if port["risk_on"] else "⚠️ 大盘破 MA200 → 总仓位 ×0.5"
-    stats, w, pool = port["stats"], port["w"], port["pool"]
-
-    # 实际占比（基于当前持仓市值）；目标是池内归一权重（结构再平衡，与总资金无关）
+    stats = port["stats"]
     equity = sum(s["shares"] * (s["mark"] or 0) for s in stats.values() if s["mark"])
-    lines = [
-        f"# 持仓调仓单 · {as_of}", "",
-        f"{risk} ｜ 股票市值 {equity/10000:.2f}万 ｜ 目标=低波加权结构（池内归一）",
-        "",
-        "| 股票 | 信号 | 现价 | 目标% | 实际% | 差额 | 动作 |",
-        "|---|---|---|---|---|---|---|",
-    ]
+    n_pos = sum(1 for s in stats.values() if s["shares"] > 0)
+
+    risk = ("🟢 大盘多头（沪深300 > MA200）——可满仓"
+            if port["risk_on"]
+            else "🔴 大盘破 MA200 —— 纪律：总仓位降至一半防守（沪深300 {}）".format(int(port["hs300"])))
+
+    lines = [f"# 持仓状态与建议 · {as_of}", "",
+             f"{risk} ｜ 持仓 {n_pos} 只 ｜ 股票市值 {equity/10000:.1f}万", ""]
+
+    # 1. 信号动作（LLM 交易员拍板；给股数级建议，不喊钱）
     actions = []
-    for c in sorted(pool, key=lambda x: -w[x]):
-        s = stats[c]
-        mark = s["mark"] or 0
-        target_pct = w[c] * 100
-        cur_mv = s["shares"] * mark
-        actual_pct = cur_mv / equity * 100 if equity else 0
-        diff = target_pct - actual_pct
-        advice = "持有"
-        if s["factor"] <= 0:
-            advice = "🔴清仓"
-        elif diff > 4:
-            advice = "🟢加买"
-        elif diff < -4:
-            advice = "🟡减卖"
-        lines.append(
-            f"| {s['name']} {c} | {s['signal'] or '-'} | {mark:.2f} | "
-            f"{target_pct:.1f}% | {actual_pct:.1f}% | {diff:+.1f}pp | {advice} |"
-        )
-        if advice in ("🟢加买", "🟡减卖", "🔴清仓"):
-            actions.append((advice, s["name"], c, diff, s["signal"] or "组合"))
-    actions.sort(key=lambda x: -abs(x[3]))
-
-    # 调仓单：只列需要动的
+    for c, s in stats.items():
+        if not s["shares"] or not s["mark"]:
+            continue
+        act = s.get("signal") or ""
+        sh = int(s["shares"])
+        if act == "清仓":
+            actions.append(f"- 🔴 **{s['name']} {c}** 清仓：现有 {sh} 股，信号清仓——按你的判断全部或分批卖出")
+        elif act == "止损":
+            actions.append(f"- 🔴 **{s['name']} {c}** 止损：现有 {sh} 股，跌破防守位止损")
+        elif act == "减仓":
+            actions.append(f"- 🟡 **{s['name']} {c}** 减仓：现有 {sh} 股，建议先减 {max(1, sh//2)} 股观察，不必一次清")
+        elif act == "加仓":
+            actions.append(f"- 🟢 **{s['name']} {c}** 加仓：现有 {sh} 股，信号加仓（右侧确认后可分批加）")
     if actions:
-        lines += ["", "## 今日调仓建议（结构差额 >4pp 才动，减少过度交易）"]
-        for advice, name, c, diff, why in actions:
-            est = abs(diff) / 100 * equity / 10000  # 万
-            if advice == "🔴清仓":
-                lines.append(f"- **{name} {c}**：清仓（信号 {why}）")
-            elif advice == "🟢加买":
-                lines.append(f"- **{name} {c}**：加买 ~{est:.1f}万（现低配 {diff:+.0f}pp；低波加权目标）")
-            else:
-                lines.append(f"- **{name} {c}**：减 ~{est:.1f}万（现超配 {diff:+.0f}pp；信号 {why}）")
+        lines += ["## 信号动作（交易员拍板）", *actions, ""]
     else:
-        lines += ["", "## 今日调仓建议", "无超阈值动作——结构已在低波加权目标附近，无需操作"]
+        lines += ["## 信号动作", "全部持有/观望——无强制动作", ""]
 
-    lines += [
-        "", "## 组合指标（样本内，历史回放）",
-        f"- 年化收益 {port['ann_ret']*100:.1f}% ｜ 年化波动 {port['ann_vol']*100:.1f}%",
-        f"- **夏普 {port['sharpe']:.2f}** ｜ **最大回撤 {port['mdd']*100:.1f}%**",
-        "- ⚠️ 样本内统计仅作参考，实盘以样本外滚动验证为准",
-    ]
+    # 2. 风险提示（非命令，提醒）
+    warns = []
+    for c, s in stats.items():
+        if not s["shares"] or not s["mark"]:
+            continue
+        pct = s["shares"] * s["mark"] / equity * 100 if equity else 0
+        if pct > 40:
+            warns.append(f"⚠️ **{s['name']}** 占 {pct:.0f}%——严重集中，若单票出事组合伤筋动骨，值得主动降")
+        elif pct > 30:
+            warns.append(f"◐ {s['name']} 占 {pct:.0f}%——偏集中，留意即可（非必须动作）")
+    if not port["risk_on"]:
+        warns.append("⚠️ 大盘在 MA200 下方：历史上此阶段满仓的 MDD 接近翻倍，降仓是纪律不是预测")
+    if warns:
+        lines += ["## 风险提示", *warns, ""]
+
+    # 3. 持仓概览
+    lines += ["## 持仓概览", "| 股票 | 信号 | 现价 | 占比 | 市值 |", "|---|---|---|---|---|"]
+    rows = []
+    for c, s in stats.items():
+        if not s["shares"]:
+            continue
+        pct = s["shares"] * (s["mark"] or 0) / equity * 100 if equity else 0
+        rows.append((pct, f"| {s['name']} {c} | {s['signal'] or '-'} | {s['mark']:.2f} | {pct:.0f}% | {s['shares']*s['mark']/10000:.2f}万 |"))
+    for _, r in sorted(rows, reverse=True):
+        lines.append(r)
+    lines += ["", "> 动作均为建议；执行后把成交发我，我更新持仓重算。"]
     return "\n".join(lines)
 
 
