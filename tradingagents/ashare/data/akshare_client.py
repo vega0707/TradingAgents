@@ -899,13 +899,13 @@ class AkshareDataClient:
             self._ak = akshare
         return self._ak
 
-    def _fetch(self, fn, *args, retries: int = 3, delay: float = 2.0, **kwargs):
+    def _fetch(self, fn, *args, retries: int = 5, delay: float = 2.0, **kwargs):
         """Call ``fn(*args, **kwargs)`` retrying transient failures.
 
         AkShare scrapes public Chinese-finance endpoints that routinely
-        drop connections; a bounded retry is the pragmatic fix. After
-        exhausting retries the last exception propagates — infrastructure
-        failures stay loud, they never become empty data.
+        drop connections / rate-limit bursts; a bounded backoff retry is the
+        pragmatic fix. After exhausting retries the last exception propagates
+        — infrastructure failures stay loud, they never become empty data.
         """
         last: Exception | None = None
         for attempt in range(retries):
@@ -918,7 +918,7 @@ class AkshareDataClient:
                     attempt + 1, retries, exc,
                 )
                 if attempt < retries - 1:
-                    time.sleep(delay)
+                    time.sleep(delay * (2 ** attempt))  # 2/4/8/16s 指数退避
         assert last is not None
         raise last
 

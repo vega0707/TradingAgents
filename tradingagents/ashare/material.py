@@ -23,26 +23,28 @@ _SINA_KLINE_URL = (
 _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/126 Safari/537.36")
 
-# 当日磁盘缓存：同一 ticker/指数的行情与基本面，同一天只从源站拉一次
-# （盘后数据不变；盘中跑批也以当日首次取价为准——"每只票只查一次实时价"）。
+# 磁盘缓存：行情当日有效（价格日变，当日首次取价即定格）；基本面按报告期窗口
+# （财报季报才变，21 天内同 ticker 不重复拉财务——请求量降 95%，抗源限流）。
 _CACHE_DIR = Path("ashare_out") / "_cache"
+SNAPSHOT_TTL_DAYS = 21
 
 
-def _cache_load(kind: str, key: str) -> object | None:
-    """当日命中返回缓存，跨天/缺失返回 None。kind 防 key 冲突（kline/snapshot）。"""
+def _cache_load(kind: str, key: str, ttl_days: int = 1) -> object | None:
+    """ttl 内命中返回缓存，过期/缺失返回 None。kind 防 key 冲突。"""
     p = _CACHE_DIR / f"{kind}-{key}.json"
     if not p.is_file():
         return None
     try:
         blob = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        saved = date.fromisoformat(blob["day"])
+    except (OSError, ValueError, KeyError):
         return None
-    if blob.get("day") != date.today().isoformat():
+    if (date.today() - saved).days >= ttl_days:
         return None
     return blob.get("data")
 
 
-def _cache_save(kind: str, key: str, data: object) -> None:
+def _cache_save(kind: str, key: str, data: object, ttl_days: int = 1) -> None:
     try:
         _CACHE_DIR.mkdir(parents=True, exist_ok=True)
         p = _CACHE_DIR / f"{kind}-{key}.json"
@@ -193,7 +195,9 @@ def build_material(ticker: str, as_of: str, name: str = "") -> Material:
     fundamentals, ok = "", False
     if not etf:
         # 当日缓存：同一 ticker 同一天重复 build（重跑/对账）不再全量拉 akshare
-        cached = _cache_load("snapshot", f"{ticker}-{as_of}")
+        # 快照缓存按 ticker（跨 as_of 共享——render 故意 date-free，同一报告期
+        # 任何 as_of 文本一致）；21 天窗口内不重复拉财务（财报季报才变）
+        cached = _cache_load("snapshot", ticker, ttl_days=SNAPSHOT_TTL_DAYS)
         if cached is not None:
             return Material(
                 ticker=ticker, name=name or f"T{ticker}", as_of=as_of, is_etf=etf,
@@ -211,9 +215,10 @@ def build_material(ticker: str, as_of: str, name: str = "") -> Material:
                 f"基本面快照不可用（{type(exc).__name__}: {str(exc)[:200]}）。"
                 "若凭现有信息无法按你的方法判断，请输出 abstain。"
             )
-        if ok:  # 只缓存成功快照；失败当日可重试，不被坏缓存挡住
-            _cache_save("snapshot", f"{ticker}-{as_of}",
-                        {"ok": True, "fundamentals": fundamentals})
+        if ok:  # 只缓存成功快照；失败可重试，不被坏缓存挡住
+            _cache_save("snapshot", ticker,
+                        {"ok": True, "fundamentals": fundamentals},
+                        ttl_days=SNAPSHOT_TTL_DAYS)
     else:
         fundamentals = (
             f"{ticker} 为 ETF/指数基金，无个股基本面（财务报表/估值不适用）。"
