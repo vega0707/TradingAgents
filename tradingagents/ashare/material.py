@@ -15,12 +15,44 @@ import time
 import urllib.request
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from pathlib import Path
 
 _SINA_KLINE_URL = (
     "https://quotes.sina.cn/cn/api/json_v2.php/CN_MarketDataService.getKLineData"
 )
 _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/126 Safari/537.36")
+
+# 当日磁盘缓存：同一 ticker/指数的行情与基本面，同一天只从源站拉一次
+# （盘后数据不变；盘中跑批也以当日首次取价为准——"每只票只查一次实时价"）。
+_CACHE_DIR = Path("ashare_out") / "_cache"
+
+
+def _cache_load(kind: str, key: str) -> object | None:
+    """当日命中返回缓存，跨天/缺失返回 None。kind 防 key 冲突（kline/snapshot）。"""
+    p = _CACHE_DIR / f"{kind}-{key}.json"
+    if not p.is_file():
+        return None
+    try:
+        blob = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if blob.get("day") != date.today().isoformat():
+        return None
+    return blob.get("data")
+
+
+def _cache_save(kind: str, key: str, data: object) -> None:
+    try:
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        p = _CACHE_DIR / f"{kind}-{key}.json"
+        p.write_text(
+            json.dumps({"day": date.today().isoformat(), "data": data},
+                       ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass  # 缓存失败不阻断主流程（下次会重新拉取）
 
 # 上证 6 开头、深证 0/3 开头；ETF：5 开头沪市、1 开头深市。
 def _prefix(ticker: str) -> str:
@@ -48,29 +80,33 @@ def _http_json(url: str, timeout: int = 10, retries: int = 3) -> object:
 
 
 def fetch_daily_kline(ticker: str, days: int = 260) -> list[dict]:
-    """新浪日 K（前复权?不——新浪 getKLineData 为不复权原始价，够用）。"""
-    url = f"{_SINA_KLINE_URL}?symbol={_prefix(ticker)}&scale=240&ma=no&datalen={days}"
-    rows = _http_json(url)
-    if not isinstance(rows, list) or not rows:
-        raise RuntimeError(f"sina kline empty for {ticker}")
-    return [
-        {"date": r["day"], "close": float(r["close"]), "high": float(r["high"]),
-         "low": float(r["low"]), "volume": float(r["volume"])}
-        for r in rows
-    ]
+    """新浪日 K（前复权?不——新浪 getKLineData 为不复权原始价，够用）。
+
+    当日磁盘缓存：同一天同一 ticker 只请求一次（盘后价不变，盘中以当日首次为准）。
+    """
+    return _kline_cached(_prefix(ticker), days)
 
 
 def fetch_symbol_kline(symbol: str, days: int = 400) -> list[dict]:
-    """按新浪符号拉日K（带前缀，如指数 'sh000300'）。"""
+    """按新浪符号拉日K（带前缀，如指数 'sh000300'）。当日缓存同上。"""
+    return _kline_cached(symbol, days)
+
+
+def _kline_cached(symbol: str, days: int) -> list[dict]:
+    cached = _cache_load("kline", f"{symbol}-{days}")
+    if cached is not None:
+        return [dict(r) for r in cached]
     url = f"{_SINA_KLINE_URL}?symbol={symbol}&scale=240&ma=no&datalen={days}"
     rows = _http_json(url)
     if not isinstance(rows, list) or not rows:
         raise RuntimeError(f"sina kline empty for {symbol}")
-    return [
+    out = [
         {"date": r["day"], "close": float(r["close"]), "high": float(r["high"]),
          "low": float(r["low"]), "volume": float(r["volume"])}
         for r in rows
     ]
+    _cache_save("kline", f"{symbol}-{days}", out)
+    return out
 
 
 def fetch_symbol_close(symbol: str, as_of: str) -> float | None:
@@ -78,15 +114,12 @@ def fetch_symbol_close(symbol: str, as_of: str) -> float | None:
 
     供 record 的 benchmark_mark 使用——只取 as_of 当日及之前的 bar。
     """
-    url = f"{_SINA_KLINE_URL}?symbol={symbol}&scale=240&ma=no&datalen=300"
     try:
-        rows = _http_json(url)
+        rows = fetch_symbol_kline(symbol, 300)  # 带当日缓存
     except Exception:
         return None
-    if not isinstance(rows, list) or not rows:
-        return None
     for r in reversed(rows):
-        if r["day"] <= as_of:
+        if r["date"] <= as_of:
             try:
                 return float(r["close"])
             except (KeyError, TypeError, ValueError):
@@ -159,6 +192,14 @@ def build_material(ticker: str, as_of: str, name: str = "") -> Material:
 
     fundamentals, ok = "", False
     if not etf:
+        # 当日缓存：同一 ticker 同一天重复 build（重跑/对账）不再全量拉 akshare
+        cached = _cache_load("snapshot", f"{ticker}-{as_of}")
+        if cached is not None:
+            return Material(
+                ticker=ticker, name=name or f"T{ticker}", as_of=as_of, is_etf=etf,
+                fundamentals=cached["fundamentals"], price_text=price_text,
+                mark=meta["mark"], fundamentals_ok=bool(cached["ok"]),
+            )
         try:
             from tradingagents.ashare.data import AkshareDataClient
             from tradingagents.ashare.snapshot import build_snapshot as bs
@@ -170,6 +211,9 @@ def build_material(ticker: str, as_of: str, name: str = "") -> Material:
                 f"基本面快照不可用（{type(exc).__name__}: {str(exc)[:200]}）。"
                 "若凭现有信息无法按你的方法判断，请输出 abstain。"
             )
+        if ok:  # 只缓存成功快照；失败当日可重试，不被坏缓存挡住
+            _cache_save("snapshot", f"{ticker}-{as_of}",
+                        {"ok": True, "fundamentals": fundamentals})
     else:
         fundamentals = (
             f"{ticker} 为 ETF/指数基金，无个股基本面（财务报表/估值不适用）。"
