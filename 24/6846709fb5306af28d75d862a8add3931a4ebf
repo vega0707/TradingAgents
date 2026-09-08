@@ -1,0 +1,23 @@
+tradingagents/ashare/material.py
+  s_e83a5402cf255a::t_b4709435edaf84 118,122
+  s_e83a5402cf255a::t_d8cfcaedde0270 195-202
+  s_e83a5402cf255a::t_132a120b23637d 214-216
+  s_e83a5402cf255a::t_6d62fb3839019d 18,26-55
+  s_e83a5402cf255a::t_76b24dce7bd9ff 83-87,91-98,103,108-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.43-trip",
+  "base_commit_sha": "246846709fb5306af28d75d862a8add3931a4ebf",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
