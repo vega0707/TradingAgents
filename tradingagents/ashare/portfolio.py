@@ -177,10 +177,19 @@ def build_portfolio(holdings, signals, as_of: str) -> dict:
         sigma = vol_from_klines(klines)
         # 现价一律用今日最新收盘（增量模式下信号可能沿用旧 record，价必须今天的）
         mark = klines[-1]["close"] if klines else None
+        closes = [k["close"] for k in klines]
+        n = len(closes)
+
+        def _ma(w):
+            return sum(closes[-w:]) / min(w, n) if n >= w else None
+
         stats[code] = {
             "name": h["name"] or code, "shares": h["shares"],
             "cost": h["cost"], "sigma": sigma,
             "factor": 1.0, "signal": "无信号", "mark": mark,
+            "ma20": _ma(20), "ma60": _ma(60),          # 右侧/触发位判断
+            "prev": closes[-2] if n >= 2 else None,     # 上穿判断
+            "ma20_y": (sum(closes[-21:-1]) / 20) if n >= 21 else None,
         }
         if code in signals:
             sig = signals[code]
@@ -250,21 +259,36 @@ def render(port: dict, capital: float = 1_000_000) -> str:
     lines = [f"# 持仓状态与建议 · {as_of}", "",
              f"{risk} ｜ 持仓 {n_pos} 只 ｜ 股票市值 {equity/10000:.1f}万", ""]
 
-    # 1. 信号动作（LLM 交易员拍板；给股数级建议，不喊钱）
+    # 1. 信号动作（LLM 交易员拍板；A股整手=100股，股数按整手给）
+    def hands_text(sh: int) -> str:
+        return f"{sh // 100} 手({sh} 股)"
+
     actions = []
     for c, s in stats.items():
         if not s["shares"] or not s["mark"]:
             continue
         act = s.get("signal") or ""
         sh = int(s["shares"])
+        ma20, ma60 = s.get("ma20"), s.get("ma60")
         if act == "清仓":
-            actions.append(f"- 🔴 **{s['name']} {c}** 清仓：现有 {sh} 股，信号清仓——按你的判断全部或分批卖出")
+            actions.append(f"- 🔴 **{s['name']} {c}** 清仓：现有 {hands_text(sh)}，信号清仓")
         elif act == "止损":
-            actions.append(f"- 🔴 **{s['name']} {c}** 止损：现有 {sh} 股，跌破防守位止损")
+            actions.append(f"- 🔴 **{s['name']} {c}** 止损：现有 {hands_text(sh)}，跌破防守位止损")
         elif act == "减仓":
-            actions.append(f"- 🟡 **{s['name']} {c}** 减仓：现有 {sh} 股，建议先减 {max(1, sh//2)} 股观察，不必一次清")
+            if sh <= 100:
+                actions.append(f"- 🟡 **{s['name']} {c}** 减仓：仅 {sh} 股(1 手以内)，要减即清仓，或先不动")
+            else:
+                cut = (sh // 2) // 100 * 100
+                actions.append(f"- 🟡 **{s['name']} {c}** 减仓：现有 {hands_text(sh)}，建议先减 {cut//100} 手({cut} 股)观察")
         elif act == "加仓":
-            actions.append(f"- 🟢 **{s['name']} {c}** 加仓：现有 {sh} 股，信号加仓（右侧确认后可分批加）")
+            # 右侧是否建立：收盘站上 MA20 且昨在上方（连续）→ 已确认；否则给触发位
+            right_now = bool(s.get("prev") is not None and ma20 and s["mark"] >= ma20)
+            if right_now:
+                right_txt = f"✅ 已站上 MA20({ma20:.2f})——右侧建立，可分批加"
+            else:
+                right_txt = f"❌ 右侧未建立：现价需站上 MA20({ma20:.2f})且连续确认"
+            dip = f"回踩加仓位 ≈ MA60×0.88 = {ma60*0.88:.2f}" if ma60 else ""
+            actions.append(f"- 🟢 **{s['name']} {c}** 加仓：现有 {hands_text(sh)} ｜ {right_txt} ｜ {dip}")
     if actions:
         lines += ["## 信号动作（交易员拍板）", *actions, ""]
     else:
