@@ -1,0 +1,31 @@
+tradingagents/ashare/llmio.py
+  s_e83a5402cf255a::t_7f2b899c6acda7 50-52
+tradingagents/ashare/daily_flow.py
+  s_e83a5402cf255a::t_b527558d1916bd 1-151
+run_local_ashare.sh
+  s_e83a5402cf255a::t_186cc24b9b971c 2-4,12-13,16,21-47,49-57,60-63
+tradingagents/ashare/portfolio.py
+  s_e83a5402cf255a::t_aa446cc3fd7eb8 44-77,79,92-93,95-98
+  s_e83a5402cf255a::t_22d99ef4a2f361 178-179,183
+  s_e83a5402cf255a::t_3469bc74c68a0d 94
+tradingagents/ashare/daily_brief.py
+  s_e83a5402cf255a::t_a33df9f476dffb 1-89
+run_daily_brief.sh
+  s_e83a5402cf255a::t_1502c68f86f2a9 1-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.43-trip",
+  "base_commit_sha": "6e613b10d448e53aa176b49f27d654b4034f75fd",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
