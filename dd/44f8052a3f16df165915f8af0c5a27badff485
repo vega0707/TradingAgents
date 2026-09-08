@@ -1,0 +1,22 @@
+tradingagents/ashare/daily_brief.py
+  s_e83a5402cf255a::t_a2d0e6c14f71d0 228-238
+  s_e83a5402cf255a::t_6315cff7835ce9 120-159,163-164
+run_morning_pick.sh
+  s_e83a5402cf255a::t_e38b16dea0ebcd 1-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.43-trip",
+  "base_commit_sha": "dd44f8052a3f16df165915f8af0c5a27badff485",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
