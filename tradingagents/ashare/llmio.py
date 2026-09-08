@@ -47,6 +47,9 @@ def complete(tier: str, system: str, user: str, max_tokens: int = 2600) -> str:
     """一次调用，返回文本；传输/网关失败抛 LLMCallError。"""
     try:
         resp = _client(tier).invoke([("system", system), ("human", user)])
+        # 兼容：标准 AIMessage 取 content；异常返回对象取纯文本
+        if hasattr(resp, "content") and isinstance(resp.content, str):
+            return resp.content
         return str(resp)
     except Exception as exc:
         raise LLMCallError(f"LLM {tier} call failed: {exc}") from exc

@@ -41,9 +41,42 @@ def load_holdings(path: str) -> list[dict]:
     ]
 
 
-def load_signals(records_dir: Path, as_of: str) -> dict[str, dict]:
-    """读当日 record.json → {code: {action, mark, name, fundamentals_ok}}。"""
+def latest_signal(records_dir: Path, code: str) -> dict | None:
+    """该 ticker 最近一次 record 的信号（任意日期目录，增量模式沿用用）。"""
+    best = None
+    for d in records_dir.glob(f"{code}-*"):
+        if not d.is_dir():
+            continue
+        rp = d / "record.json"
+        if not rp.exists():
+            continue
+        try:
+            rec = json.loads(rp.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        as_of = rec.get("as_of", d.name.rsplit("-", 1)[-1])
+        if best is None or as_of > best["as_of"]:
+            best = {"as_of": as_of, "rec": rec}
+    if best is None:
+        return None
+    rec = best["rec"]
+    return {
+        "action": (rec.get("trader") or {}).get("action", ""),
+        "mark": rec.get("mark"),
+        "name": rec.get("name") or code,
+        "fundamentals_ok": rec.get("fundamentals_ok"),
+        "as_of": best["as_of"],
+    }
+
+
+def load_signals(records_dir: Path, as_of: str, fallback: bool = True) -> dict[str, dict]:
+    """读当日 record.json → {code: {action, mark, name, fundamentals_ok}}。
+
+    fallback=True 时无当日 record 的票回退到最近一次 record（增量模式下
+    多数票当天不深析，沿用最近信号）。
+    """
     out: dict[str, dict] = {}
+    found: set[str] = set()
     for d in sorted(records_dir.glob(f"*-{as_of}")):
         code = d.name[: -len(as_of) - 1]
         rp = d / "record.json"
@@ -56,6 +89,13 @@ def load_signals(records_dir: Path, as_of: str) -> dict[str, dict]:
             "name": rec.get("name") or code,
             "fundamentals_ok": rec.get("fundamentals_ok"),
         }
+        found.add(code)
+    if fallback:
+        for code in {d.parent.name.split("-")[0] for d in records_dir.glob("*-*/record.json") if d.is_file()} - found:
+            sig = latest_signal(records_dir, code)
+            if sig:
+                sig.pop("as_of", None)
+                out[code] = sig
     return out
 
 
@@ -135,16 +175,17 @@ def build_portfolio(holdings, signals, as_of: str) -> dict:
         except Exception:
             klines = []
         sigma = vol_from_klines(klines)
+        # 现价一律用今日最新收盘（增量模式下信号可能沿用旧 record，价必须今天的）
+        mark = klines[-1]["close"] if klines else None
         stats[code] = {
             "name": h["name"] or code, "shares": h["shares"],
             "cost": h["cost"], "sigma": sigma,
-            "factor": 1.0, "signal": "无信号", "mark": None,
+            "factor": 1.0, "signal": "无信号", "mark": mark,
         }
         if code in signals:
             sig = signals[code]
             stats[code]["signal"] = sig["action"] or "无信号"
             stats[code]["factor"] = SIGNAL_TO_FACTOR.get(sig["action"], 1.0)
-            stats[code]["mark"] = sig["mark"]
             stats[code]["fundamentals_ok"] = sig["fundamentals_ok"]
 
     # 2. 入池：持仓票(shares>0)保留；已清仓票(shares=0)仅当信号为建仓/加仓才回场
