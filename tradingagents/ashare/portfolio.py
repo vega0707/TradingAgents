@@ -284,11 +284,10 @@ def render(port: dict, capital: float = 1_000_000) -> str:
             # 右侧是否建立：收盘站上 MA20 且昨在上方（连续）→ 已确认；否则给触发位
             right_now = bool(s.get("prev") is not None and ma20 and s["mark"] >= ma20)
             if right_now:
-                right_txt = f"✅ 已站上 MA20({ma20:.2f})——右侧建立，可分批加"
+                actions.append(f"- 🟢 **{s['name']} {c}** 加仓：现有 {hands_text(sh)} ｜ ✅ 右侧建立（站上 MA20 {ma20:.2f}）——可分批加")
             else:
-                right_txt = f"❌ 右侧未建立：现价需站上 MA20({ma20:.2f})且连续确认"
-            dip = f"回踩加仓位 ≈ MA60×0.88 = {ma60*0.88:.2f}" if ma60 else ""
-            actions.append(f"- 🟢 **{s['name']} {c}** 加仓：现有 {hands_text(sh)} ｜ {right_txt} ｜ {dip}")
+                dip = f"回踩加仓位 ≈ MA60×0.88 = {ma60*0.88:.2f}" if ma60 else ""
+                actions.append(f"- ⏳ **{s['name']} {c}** 加仓信号：右侧未建立（需站上 MA20 {ma20:.2f} 连续确认）｜ {dip}")
     if actions:
         lines += ["## 信号动作（交易员拍板）", *actions, ""]
     else:
