@@ -117,9 +117,51 @@ def tx_quotes(codes: list[str]) -> dict[str, dict]:
     return out
 
 
+def deep_dive(cands: list[dict], as_of: str) -> list[str]:
+    """对候选逐只跑完整深析（run.py 全管线）→ 推荐行。
+
+    每只独立子进程（约 5-7 分钟），产出落 ashare_out/{code}-{as_of}/。
+    """
+    import subprocess
+    import sys as _sys
+
+    out: list[str] = []
+    for c in cands:
+        code = c["code"]
+        name = c["name"]
+        print(f"\n[深析] {name} {code} ({as_of}) …", flush=True)
+        r = subprocess.run(
+            [_sys.executable, "-m", "tradingagents.ashare.run",
+             "--ticker", code, "--name", name, "--date", as_of,
+             "--force", "--no-cloud"],
+            capture_output=True, text=True, timeout=900,
+        )
+        rec_p = Path("ashare_out") / f"{code}-{as_of}" / "record.json"
+        if not rec_p.exists():
+            out.append(f"- **{name} {code}**：深析失败（{(r.stdout+r.stderr)[-200:]}）")
+            continue
+        rec = json.loads(rec_p.read_text(encoding="utf-8"))
+        t = rec.get("trader") or {}
+        m = rec.get("manager") or {}
+        act = t.get("action", "?")
+        tag = {"建仓": "🟢 可入", "加仓": "🟢 可入", "持有": "◐ 持有", "观望": "◐ 观望",
+               "减仓": "🔴 回避", "清仓": "🔴 回避", "止损": "🔴 回避"}.get(act, act)
+        reason = (t.get("reasoning") or "")[:130]
+        levels = (t.get("levels") or "")[:80]
+        out.append(f"- **{name} {code}** 现价 {rec.get('mark')} ｜ {tag}"
+                   f"（交易员:{act} 研经:{m.get('recommendation')}({m.get('confidence')})）")
+        if reason:
+            out.append(f"  理由：{reason}")
+        if levels:
+            out.append(f"  关键位：{levels}")
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--pages", type=int, default=4)
+    ap.add_argument("--date", default=time.strftime("%Y-%m-%d"), help="分析截至日期")
+    ap.add_argument("--deep", type=int, default=0, help="对前 N 个候选跑完整深析")
     args = ap.parse_args()
 
     table = code_table()
@@ -183,7 +225,17 @@ def main() -> None:
         note = comments.get(c["code"], "")
         md.append(f"- **{c['name']} {c['code']}** 价{c['price'] or '?'} "
                   f"今{c['pct']:+.1f}% ｜ {note}")
-    md.append("\n> 情报提示非投资建议；候选仅作研究池，是否入池深析另行决定。")
+    if not args.deep:
+        md.append("\n> 情报提示非投资建议；候选仅作研究池，是否入池深析另行决定。")
+        print("\n".join(md))
+        return
+
+    # --deep：对候选跑完整 LLM 深析（run.py 全管线），输出入手推荐
+    deep = deep_dive([c for c in cands if c["code"]][: args.deep], args.date)
+    md += ["", "## 候选深析 · 交易员推荐（完整管线 10 大师+辩论）", ""]
+    for r in deep:
+        md.append(r)
+    md.append("\n> 深析结果基于基本面快照；买入前请自行确认与组合匹配。")
     print("\n".join(md))
 
 
