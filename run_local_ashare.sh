@@ -51,26 +51,44 @@ $PY -m tradingagents.ashare.daily_flow --portfolio --date "$DATE" --tickers "$TI
     > "logs/portfolio-${DATE}.md" 2>>"$LOG"
 echo "[$DATE] 组合层已更新 → logs/portfolio-${DATE}.md" >> "$LOG"
 
-# 4. 每日决策单：合并 调仓单 + 当日深析信号 + 观察池触发 → 每天必推
-#    （用户要求：天天推，但要有策略/调仓单/理由）
+# 4. 决策单：合并 调仓单 + 当日深析信号 + 观察池触发
+#    推送规则（用户确认）：有可交易动作才推（且会天天推直到用户执行调仓）；
+#    全平衡/无信号/观察池安静 → 不推。用户执行后更新 tickers → 差额消除自动停推。
 SIGNALS=$($PY -m tradingagents.ashare.make_daily_card --signals "$DATE" 2>/dev/null)
 WL_OUT=$($PY -m tradingagents.ashare.watchlist_check --date "$DATE" 2>/dev/null)
 
+# 动作判断：调仓单含加买/减卖/清仓（🟢🟡🔴）即"有可交易建议"
+PORTFOLIO_MD="logs/portfolio-${DATE}.md"
+if grep -qE "🟢|🟡|🔴" "$PORTFOLIO_MD" 2>/dev/null; then
+  HAS_TRADE=1
+else
+  HAS_TRADE=0
+fi
+WL_HIT=0
+if [[ "$WL_OUT" != *"安静"* && -n "$WL_OUT" ]]; then
+  WL_HIT=1
+fi
+
+if [[ $HAS_TRADE -eq 0 && -z "$SIGNALS" && $WL_HIT -eq 0 ]]; then
+  echo "[$DATE] 组合平衡+无新信号+观察池安静 → 无交易动作，不推" >> "$LOG"
+  exit 0
+fi
+
 {
-  cat "logs/portfolio-${DATE}.md"
+  cat "$PORTFOLIO_MD"
   if [[ -n "$SIGNALS" ]]; then
     echo ""
     echo "## 今日深析新信号"
     echo "$SIGNALS"
   fi
-  if [[ "$WL_OUT" != *"安静"* && -n "$WL_OUT" ]]; then
+  if [[ $WL_HIT -eq 1 ]]; then
     echo ""
     echo "$WL_OUT"
     echo "$WL_OUT" > "logs/watchlist-${DATE}.md" 2>/dev/null || true
   fi
 } > /tmp/ashare-daily.md
 cp /tmp/ashare-daily.md "logs/daily-${DATE}.md"
-echo "[$DATE] 每日决策单生成（信号:$([ -n "$SIGNALS" ] && echo 有 || echo 无)，观察池:$([ "$WL_OUT" != *"安静"* ] && echo 触发 || echo 安静)）" >> "$LOG"
+echo "[$DATE] 有交易动作 → 推决策单（调仓:$HAS_TRADE 信号:$([ -n "$SIGNALS" ] && echo 有 || echo 无) 观察池:$WL_HIT）" >> "$LOG"
 
 # 5. 推送每日决策单
 if [[ -s /tmp/ashare-daily.md ]]; then
