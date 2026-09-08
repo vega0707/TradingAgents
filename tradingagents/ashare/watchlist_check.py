@@ -17,22 +17,28 @@ import yaml
 from tradingagents.ashare.material import fetch_daily_kline
 
 WL = Path(__file__).resolve().parents[2] / "config" / "watchlist.yaml"
+DIP = 0.92  # 与回测一致：MA60 乖离 -8%
+STATE = Path(__file__).resolve().parents[2] / "ashare_out" / "_cache" / "watchlist_state.json"
 
 
-def last_close(code: str, as_of: str) -> tuple[float | None, float | None, float | None, float | None]:
-    """(现价, MA20, MA60, 60日低)"""
+def kline_state(code: str, as_of: str) -> dict | None:
+    """现价/MA20/MA60 及昨日 MA20（上穿判断需要）。"""
     try:
         rows = [k for k in fetch_daily_kline(code, 200) if k["date"] <= as_of]
-        if not rows:
-            return None, None, None, None
+        if len(rows) < 65:
+            return None
         closes = [r["close"] for r in rows]
+        n = len(closes)
         px = closes[-1]
-        ma20 = sum(closes[-20:]) / min(20, len(closes))
-        ma60 = sum(closes[-60:]) / min(60, len(closes))
-        lo60 = min(closes[-60:])
-        return px, ma20, ma60, lo60
+
+        def ma(w, end):
+            seg = closes[end - w + 1:end + 1]
+            return sum(seg) / len(seg)
+
+        return {"px": px, "prev": closes[-2], "ma20": ma(20, n - 1),
+                "ma20_y": ma(20, n - 2), "ma60": ma(60, n - 1)}
     except Exception:
-        return None, None, None, None
+        return None
 
 
 def main() -> None:
@@ -43,30 +49,56 @@ def main() -> None:
         print("无 watchlist.yaml")
         return
     data = yaml.safe_load(WL.read_text(encoding="utf-8"))
-    triggers = []   # 值得推的触发事件
-    quiet = []      # 无触发标的（仅日志）
+    # 状态：上一轮是否已在触发区——只在"新进入"当天推，避免天天重复
+    prev_state: dict[str, bool] = {}
+    if STATE.is_file():
+        try:
+            import json
+            prev_state = json.loads(STATE.read_text(encoding="utf-8"))
+        except Exception:
+            prev_state = {}
+    cur_state: dict[str, bool] = {}
+    triggers = []
+    quiet = []
     for w in data.get("watchlist", []):
         code = w["code"]
         name = w.get("name", code)
-        px, ma20, ma60, lo60 = last_close(code, args.date)
-        if px is None:
+        st = kline_state(code, args.date)
+        if not st:
+            quiet.append(f"{name} {code}: 数据不足")
             continue
-        ev = []
-        # 右侧信号：站上 MA20（此前在下方 → 趋势转好起点）
-        if ma20 and px >= ma20:
-            ev.append(f"站上 MA20({ma20:.2f})——右侧信号出现")
-        # 风险线
+        px = st["px"]
+        tt = w.get("trigger_type", "dip_buy")
+        fired = False
+        note = ""
+        if tt == "ma20_cross":
+            if st["ma20_y"] and st["prev"] < st["ma20_y"] and px >= st["ma20"]:
+                fired = True
+                note = f"上穿 MA20({st['ma20']:.2f}) 右侧动量信号"
+        elif tt == "dip_buy":
+            target = st["ma60"] * DIP
+            if px <= target:
+                fired = True
+                note = f"深跌乖离买点（价 {px:.2f} ≤ MA60×0.92 = {target:.2f}）"
+        cur_state[code] = fired
         risk = w.get("risk_line")
-        if risk and px < risk:
-            ev.append(f"⚠️跌破风险线 {risk} → 建议剔除观察池")
-        if ev:
-            triggers.append(f"- **{name} {code}** 现价 {px} ｜ " + "；".join(ev))
-            tb = w.get("trigger_buy")
-            if tb:
-                triggers.append(f"   买点观察：{tb}")
+        risk_hit = bool(risk and px < risk)
+        # 新进入触发区 或 破风险线 → 才推
+        if (fired and not prev_state.get(code)) or (risk_hit and not prev_state.get(code)):
+            ev = note
+            if risk_hit:
+                ev += f"；⚠️跌破风险线 {risk} → 建议剔除"
+            triggers.append(f"- **{name} {code}** 现价 {px:.2f} ｜ {ev}")
+        elif fired:
+            quiet.append(f"{name} {code}: 已在触发区内（上次已提示）")
         else:
-            above60 = f"站上MA60" if ma60 and px >= ma60 else "MA60下方"
-            quiet.append(f"{name} {code} 价{px} MA20下方/{above60} — 无触发")
+            quiet.append(f"{name} {code} 价{px:.2f}（MA20 {st['ma20']:.2f}/MA60 {st['ma60']:.2f}）无触发")
+    try:
+        import json
+        STATE.parent.mkdir(parents=True, exist_ok=True)
+        STATE.write_text(json.dumps(cur_state), encoding="utf-8")
+    except Exception:
+        pass
     if triggers:
         print(f"# 观察池触发 · {args.date}\n")
         print("\n".join(triggers))

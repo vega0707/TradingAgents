@@ -1,33 +1,36 @@
-# watchlist.yaml — 非持仓观察池：值得追踪的候选，每日监控触发位
-# 命中 trigger_buy / 价格异动>5% 时提醒深析确认；跌破 risk_line 剔除。
+# watchlist.yaml — 非持仓观察池，每票绑定回测验证过的触发类型
+# （2026-09-08 回测：深跌乖离 dip_buy 在弱势市 4/5 票最优；追新高 high60 是坑）
+# trigger_type:
+#   dip_buy     现价 <= MA60×0.92（深跌乖离 -8%）→ 超跌买点（均值回归）
+#   ma20_cross  收盘上穿 MA20 → 右侧动量（仅北湾港回测有效）
 watchlist:
   - code: "000970"
     name: 中科三环
     added: "2026-09-08"
-    thesis: "稀土永磁龙头，PB2.2 相对板块低；简报'值得跟踪'，深析观望（营收反转但增收不增利）"
-    trigger_buy: "放量突破 MA20 12.42（右侧）"
-    risk_line: 11.74
+    thesis: "稀土永磁龙头 PB2.2；深析观望但深跌后均值回归最强(dip_buy +3.9%胜79%)"
+    trigger_type: dip_buy
+    risk_line: 10.6
   - code: "600548"
     name: 深高速
     added: "2026-09-08"
-    thesis: "公路破净 PB0.9 + 高股息 + 60日超跌，最贴合低波价值风格；未深析"
-    trigger_buy: "深析确认基本面无雷后，企稳站回 MA20"
+    thesis: "公路破净 PB0.9 高股息；dip_buy +2.2%胜71% 回测有效；未深析"
+    trigger_type: dip_buy
     risk_line: null
   - code: "600196"
     name: 复星医药
     added: "2026-09-08"
-    thesis: "综合药企 PB1.2 破净附近，医疗中期强势(60日+10%)中的低估值补涨候选；未深析"
-    trigger_buy: "深析确认后"
+    thesis: "医疗低 PB1.2；dip_buy +4.8%胜81% 观察池最强；未深析"
+    trigger_type: dip_buy
     risk_line: null
   - code: "600332"
     name: 白云山
     added: "2026-09-08"
-    thesis: "中药+大健康 PB0.84 破净 PE11 防御；与复星同为医疗低估值候选"
-    trigger_buy: "深析确认后"
+    thesis: "中药破净 PB0.84；dip_buy 弱正；防御候选"
+    trigger_type: dip_buy
     risk_line: null
   - code: "000582"
     name: 北部湾港
     added: "2026-09-08"
-    thesis: "港口 PB1.4，今日急跌但 60 日未超跌，弱候选"
-    trigger_buy: null
+    thesis: "港口；唯 ma20_cross 有效(+1.8%胜68%)，追新高大亏——仅右侧动量"
+    trigger_type: ma20_cross
     risk_line: null
