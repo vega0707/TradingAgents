@@ -1,0 +1,33 @@
+# watchlist.yaml — 非持仓观察池：值得追踪的候选，每日监控触发位
+# 命中 trigger_buy / 价格异动>5% 时提醒深析确认；跌破 risk_line 剔除。
+watchlist:
+  - code: "000970"
+    name: 中科三环
+    added: "2026-09-08"
+    thesis: "稀土永磁龙头，PB2.2 相对板块低；简报'值得跟踪'，深析观望（营收反转但增收不增利）"
+    trigger_buy: "放量突破 MA20 12.42（右侧）"
+    risk_line: 11.74
+  - code: "600548"
+    name: 深高速
+    added: "2026-09-08"
+    thesis: "公路破净 PB0.9 + 高股息 + 60日超跌，最贴合低波价值风格；未深析"
+    trigger_buy: "深析确认基本面无雷后，企稳站回 MA20"
+    risk_line: null
+  - code: "600196"
+    name: 复星医药
+    added: "2026-09-08"
+    thesis: "综合药企 PB1.2 破净附近，医疗中期强势(60日+10%)中的低估值补涨候选；未深析"
+    trigger_buy: "深析确认后"
+    risk_line: null
+  - code: "600332"
+    name: 白云山
+    added: "2026-09-08"
+    thesis: "中药+大健康 PB0.84 破净 PE11 防御；与复星同为医疗低估值候选"
+    trigger_buy: "深析确认后"
+    risk_line: null
+  - code: "000582"
+    name: 北部湾港
+    added: "2026-09-08"
+    thesis: "港口 PB1.4，今日急跌但 60 日未超跌，弱候选"
+    trigger_buy: null
+    risk_line: null

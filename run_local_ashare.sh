@@ -51,10 +51,27 @@ $PY -m tradingagents.ashare.daily_flow --portfolio --date "$DATE" --tickers "$TI
     > "logs/portfolio-${DATE}.md" 2>>"$LOG"
 echo "[$DATE] 组合层已更新 → logs/portfolio-${DATE}.md" >> "$LOG"
 
-# 4. 推送闸门：仅当日有深析且出现调仓动作才推；无新动作不推
+# 4b. 观察池检查：候选票触发（站上MA20/破风险线）才推；安静不打扰
+WL_OUT=$($PY -m tradingagents.ashare.watchlist_check --date "$DATE" 2>/dev/null)
+if [[ "$WL_OUT" != *"安静"* && -n "$WL_OUT" ]]; then
+  echo "$WL_OUT" > /tmp/ashare-watchlist.md
+  cp /tmp/ashare-watchlist.md "logs/watchlist-${DATE}.md"
+  echo "[$DATE] 观察池触发 → 推" >> "$LOG"
+  scp -i "$KEY" -q /tmp/ashare-watchlist.md ubuntu@124.221.95.205:/tmp/ashare-watchlist.md 2>>"$LOG"
+  ssh -i "$KEY" ubuntu@124.221.95.205 "cd /home/ubuntu/TradingAgents && set -a && source .env && set +a && \
+    BIN=\$HOME/.local/share/pnpm/global/5/.pnpm/openclaw@2026.7.1-2/node_modules/openclaw/dist/index.js && \
+    NODE=\$HOME/.nvm/versions/node/v22.23.2/bin/node && \
+    \$NODE \$BIN message send --channel feishu --account \"\$FEISHU_ACCOUNT\" --target \"\$FEISHU_TARGET\" -m \"\$(cat /tmp/ashare-watchlist.md)\"" >>"$LOG" 2>&1 \
+    && echo "[$DATE] 已发观察池触发" >> "$LOG" \
+    || echo "[$DATE] 观察池推送失败（在 logs/watchlist-${DATE}.md）" >> "$LOG"
+else
+  echo "[$DATE] 观察池安静（无触发）" >> "$LOG"
+fi
+
+# 4c. 持仓信号闸门：仅当日有深析且出现调仓动作才推；无新动作不推
 SIGNALS=$($PY -m tradingagents.ashare.make_daily_card --signals "$DATE" 2>/dev/null)
 if [[ -z "$SIGNALS" ]]; then
-  echo "[$DATE] 无当日调仓动作 → 不推飞书（组合层在 logs/portfolio-${DATE}.md）" >> "$LOG"
+  echo "[$DATE] 无当日调仓动作 → 不推持仓卡（组合层在 logs/portfolio-${DATE}.md）" >> "$LOG"
   exit 0
 fi
 
