@@ -76,6 +76,13 @@ def annual_vol(code: str, as_of: str, n: int = 120) -> float:
         if len(closes) < 40:
             return 0.20
         rets = [closes[i] / closes[i - 1] - 1 for i in range(1, len(closes))]
+        # Winsorize 两端 5%：剔除暴涨暴跌日(涨停/跌停/异动)对 σ 的扭曲——
+        # 汉缆 σ=67% 主因是涨停日把波动率推高，导致 r 惩罚过重
+        if len(rets) >= 20:
+            sr = sorted(rets)
+            lo = sr[max(0, int(len(sr) * 0.05))]
+            hi = sr[min(len(sr) - 1, int(len(sr) * 0.95))]
+            rets = [min(max(x, lo), hi) for x in rets]
         mean = sum(rets) / len(rets)
         var = sum((x - mean) ** 2 for x in rets) / (len(rets) - 1)
         return (var ** 0.5) * (252 ** 0.5)
@@ -142,6 +149,7 @@ def fair_value(code: str, as_of: str, name: str = "", snap=None,
             if not sm:
                 return None
             roe, bvps, g = sm["roe"], sm["bvps"], sm["g"]
+            roe_note = "新浪单期(可能非年报口径)"
             pct = None
             src = "sina"
         else:
@@ -150,9 +158,18 @@ def fair_value(code: str, as_of: str, name: str = "", snap=None,
                 return None
             # ROE 用最近年报(12-31)期——快照 roe_avg 混入未年化的 Q1 单季
             # ROE(4%)会摊薄真实盈利(格力年报 20%→均值 14%)，口径失真
-            annual = next((p.return_on_equity for p in snap.periods
-                           if p.return_on_equity and p.report_period.endswith("12-31")), None)
-            roe = annual or (snap.roe_avg or 0.0)
+            # ROE 保守估计：min(近5年报中位, 最新年报)——下行趋势票
+            # (格力 25%→20%、汉缆 12%→6%)若用历史中位会高估盈利，保守取低者
+            annuals = [p.return_on_equity for p in snap.periods
+                       if p.return_on_equity and p.report_period.endswith("12-31")][:5]
+            if annuals:
+                med = statistics.median(annuals)
+                roe = min(med, annuals[0])   # annuals[0]=最新年报(periods 最新在前)
+                roe_note = (f"min(中位{med*100:.0f}%,最新{annuals[0]*100:.0f}%)"
+                            + ("↓" if annuals[0] < med else "↑"))
+            else:
+                roe = snap.roe_avg or 0.0
+                roe_note = "均值(无年报)"
             # g 固定 0（零增长保守假设）：bvps_cagr 账面增长含会计因素，
             # 类债资产(长电)上失真会让 Gordon 分母爆炸，保守不为增长付溢价
             g = 0.0
@@ -173,6 +190,7 @@ def fair_value(code: str, as_of: str, name: str = "", snap=None,
             "bvps": bvps, "cur_pb": cur_pb, "fair_pb": fair_pb,
             "fair_price": fair_price, "delta_pct": delta,
             "pb_pct": pct, "zone": zone, "r": r, "r_how": how, "src": src,
+            "roe_note": roe_note,
         }
     except Exception as _e:
         import traceback as _tb
@@ -182,9 +200,10 @@ def fair_value(code: str, as_of: str, name: str = "", snap=None,
 
 def render(v: dict) -> str:
     pct_s = f"｜PB分位 {v['pb_pct']:.0f}%" if v.get("pb_pct") is not None else ""
+    note = f"({v['roe_note']})" if v.get("roe_note") else ""
     return (f"{v['code']}: 现价 {v['price']:.2f} vs 合理价 {v['fair_price']:.1f} "
             f"({v['delta_pct']:+.0f}%) {v['zone']} {pct_s} ｜ "
-            f"r={v['r']*100:.0f}%({v['r_how']}) ROE {v['roe']*100:.0f}% "
+            f"r={v['r']*100:.0f}%({v['r_how']}) ROE {v['roe']*100:.0f}%{note} "
             f"现PB {v['cur_pb']:.2f} 合理PB {v['fair_pb']:.2f}")
 
 
