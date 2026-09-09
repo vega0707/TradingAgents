@@ -24,14 +24,20 @@
 - 全市场 5500 只 × 2500 根 ≈ 1375 万根 → 不现实，**别做全量**
 - 范围限定：持仓(13) + 观察池(5) + 候选池(~20) ≈ **40 只** → 拉取与存储都轻松
 
-## 三、落库设计（推荐 SQLite）
+## 三、落库设计（2026-09-09 选型：Turso edge SQLite）
+
+**选型结论**：用 **Turso**（用户 steel 项目已注册，cfg.properties 有连接配置）。
+理由：免费 9GB（Neon/Supabase 0.5GB 的 18 倍，唯一能撑全市场 1250 万行）、
+SQLite 语义与现有代码/DDL 无缝、10 亿行读/月配额充足。备选 Supabase（Postgres，
+有网页看板，500MB 关注池够）。**弃**：Mongo(文档型)、Upstash(Redis)、Aiven(额度小)、
+本地 SQLite(云上 cursor 无法共享)、D2(公开行情数据不需公司库)。
 
 ```
-项目根 / data / market.db
+Turso 库（libSQL / edge SQLite，多端共享）
 
 表 kline(code TEXT, date TEXT, open REAL, high REAL, low REAL,
          close REAL, volume REAL, PRIMARY KEY(code, date))
-   — 长历史日K，关注池按需灌入，增量更新（每次只补缺失日期）
+   — 长历史日K，关注池按需灌入，增量更新（每日只补缺失日期）
 
 表 bvps_history(code TEXT, report_period TEXT, bvps REAL, filing_date TEXT)
    — PIT 每股净资产序列（来源：akshare 快照已含，落地防重复拉）
@@ -40,8 +46,11 @@
    — 每日估值结果快照（历史可回溯、可审计）
 ```
 
-- SQLite 单文件、零运维、Python 标准库 `sqlite3` 可用，无新依赖
-- 写入策略：日K 拉取后**先落库再删/忽略 JSON 过渡缓存**（`ashare_out/_cache/kline-*.json` 现有当日缓存机制可保留为内存层，SQLite 为持久层）
+- 连接：Turso URL + token（cfg.properties `turso` 段），Python 用
+  `libsql-experimental` / SQLAlchemy+`sqlalchemy-turso` 驱动；云上 cursor 同库
+- 写入链路：**本机外部接口拉取（新浪/腾讯）→ 写 Turso**；不存本地 JSON 主副本
+  （`_cache/` 现有当日缓存降级为进程内/当日层，Turso 为持久真相）
+- 数据量：关注池 40 只 × 2500 根 ≈ 10 万行 ≈ 5MB——Turso 免费层毫无压力
 
 ## 四、数据源与限流经验（重要）
 
@@ -72,6 +81,8 @@
 
 ## 六、实施步骤（给 cursor）
 
+0. **准备 Turso**：从 steel `cfg.properties` `turso` 段取 URL+token（或登录 turso.tech 建 db）；
+   `pip install libsql-experimental`（或 sqlalchemy-turso）；测试多端连接（本机/云上）
 1. **验证数据源长历史能力**（各 1 次请求，不批量）：
    - 腾讯 fqkline 指定起止日能否返回 2021 至今（~1250 根）
    - 新浪 datalen=1250 是否被截断
