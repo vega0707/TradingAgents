@@ -134,6 +134,82 @@ def _already_deep(code: str, as_of: str, days: int = 3) -> str | None:
     return None
 
 
+def current_equity() -> float:
+    """当前持仓股票市值（读 tickers + 现价），供单票上限/手数计算。"""
+    import yaml
+    try:
+        d = yaml.safe_load(Path("/Users/vega/git/ai-hedge-fund/config/tickers.yaml").read_text(encoding="utf-8"))
+        eq = 0.0
+        for t in d["tickers"]:
+            s = float(t.get("shares") or 0)
+            if s <= 0:
+                continue
+            rows = [k for k in fetch_daily_kline(t["code"], 5)]
+            if rows:
+                eq += s * rows[-1]["close"]
+        return eq or 100_000.0
+    except Exception:
+        return 100_000.0
+
+
+def high_gate(c: dict, price: float) -> list[str]:
+    """风格闸：高位/高估检查（用户硬约束：不追高、低回撤）。"""
+    flags = []
+    pb = c.get("pb")
+    if pb:
+        try:
+            if float(pb) > 4:
+                flags.append(f"PB {pb} 倍(>4)")
+        except ValueError:
+            pass
+    try:
+        rows = [k for k in fetch_daily_kline(c["code"], 90)]
+        closes = [r["close"] for r in rows[-60:]]
+        hi60 = max(closes)
+        if price and hi60 and (hi60 - price) / hi60 < 0.05:
+            flags.append("贴 60 日高点(<5%)")
+    except Exception:
+        pass
+    return flags
+
+
+def advice_card(c: dict, rec_line: str, as_of: str) -> list[str]:
+    """可执行卡：裁决/风格闸/几手/关键位/止损。"""
+    import json
+
+    out = [rec_line]
+    price = c.get("price")
+    gates = high_gate(c, price or 0)
+    equity = current_equity()
+    cap = equity * 0.05
+    if price:
+        hand_cost = price * 100
+        lots = int(cap // hand_cost) if hand_cost else 0
+        if lots < 1:
+            out.append(f"  💰 1手={hand_cost/10000:.1f}万 > 单票上限 {cap/10000:.1f}万(组合5%)"
+                       f"——**当前不适合建仓**（除非明确超配意愿）")
+        else:
+            out.append(f"  💰 单票上限 {cap/10000:.1f}万 → 最多 {lots} 手（1手={hand_cost/10000:.1f}万）")
+    if gates:
+        out.append(f"  ⚠️ 风格闸命中：{'、'.join(gates)}——与你的低回撤原则冲突，仅建议小仓试探或回避")
+    rec_p = Path("ashare_out") / f"{c['code']}-{as_of}" / "record.json"
+    if rec_p.exists():
+        rec = json.loads(rec_p.read_text(encoding="utf-8"))
+        t = rec.get("trader") or {}
+        # 细节(reasoning/levels/stop_loss)在 decision.json
+        dec_p = Path("ashare_out") / f"{c['code']}-{as_of}" / "decision.json"
+        dt = {}
+        if dec_p.exists():
+            dt = (json.loads(dec_p.read_text(encoding="utf-8")) or {}).get("trader") or {}
+        if dt.get("levels"):
+            out.append(f"  📍 关键位：{dt['levels'][:110]}")
+        if dt.get("stop_loss"):
+            out.append(f"  🛑 止损：{dt['stop_loss'][:90]}")
+        elif t.get("stop_loss"):
+            out.append(f"  🛑 止损：{t['stop_loss'][:90]}")
+    return out
+
+
 def deep_one(code: str, name: str, as_of: str) -> str:
     """单只完整深析 → 推荐行文本。"""
     import json
@@ -201,9 +277,11 @@ def deep_dive(cands: list[dict], as_of: str) -> tuple[list[str], int, int]:
     results = []
     with ThreadPoolExecutor(max_workers=2) as ex:
         futs = {ex.submit(deep_one, c["code"], c["name"], as_of): c for c in warmed}
-        for f in futs:
-            results.append(f.result())
-    ok = sum(1 for x in results if "深析失败" not in x)
+        by_code = {futs[f]["code"]: f for f in futs}
+        for c in warmed:  # 按候选顺序收结果（并行但输出有序）
+            f = by_code[c["code"]]
+            results.append((c, f.result()))
+    ok = sum(1 for _, x in results if "深析失败" not in x)
     fail = len(results) - ok
     return results, ok, fail
 
@@ -281,16 +359,18 @@ def main() -> None:
         print("\n".join(md))
         return
 
-    # --deep：对候选跑完整 LLM 深析（run.py 全管线，去重+预热+2路并行）
+    # --deep：对候选跑完整 LLM 深析（去重+预热+2路并行）+ 可执行卡
     deep, ok_n, fail_n = deep_dive([c for c in cands if c["code"]][: args.deep], args.date)
     if not deep:
         print("候选均近 3 天已深析 → 无新深析，跳过推荐")
         return
     md += ["", f"## 候选深析 · 交易员推荐（完成 {ok_n}/{ok_n+fail_n} 只" +
            (f"，{fail_n} 只失败" if fail_n else "") + "）", ""]
-    for r in deep:
-        md.append(r)
-    md.append("\n> 深析结果基于基本面快照；买入前请自行确认与组合匹配。")
+    for c, line in deep:
+        for row in advice_card(c, line, args.date):
+            md.append(row)
+        md.append("")
+    md.append("> 裁决规则：深析(10大师)为准；但风格闸命中(高PB/贴高点)时与低回撤原则冲突，只建议小仓/回避。")
     print("\n".join(md))
 
 
