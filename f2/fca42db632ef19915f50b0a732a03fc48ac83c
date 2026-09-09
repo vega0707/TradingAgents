@@ -1,0 +1,20 @@
+docs/PB-percentile-and-storage-handover.md
+  s_e83a5402cf255a::t_78c967500c630a 55-81
+  s_e83a5402cf255a::t_7c148fbd0e6cfd 111-115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.43-trip",
+  "base_commit_sha": "f2fca42db632ef19915f50b0a732a03fc48ac83c",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
