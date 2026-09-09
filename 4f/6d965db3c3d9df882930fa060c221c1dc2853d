@@ -1,0 +1,19 @@
+tradingagents/ashare/moneyflow.py
+  s_e83a5402cf255a::t_ebd118e2ccfebc 1-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.43-trip",
+  "base_commit_sha": "4f6d965db3c3d9df882930fa060c221c1dc2853d",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
