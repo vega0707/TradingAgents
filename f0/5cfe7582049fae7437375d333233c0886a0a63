@@ -1,0 +1,25 @@
+tradingagents/ashare/db.py
+  s_e83a5402cf255a::t_6bee0daaf114db 75-92,94-96,100-105
+  s_e83a5402cf255a::t_3a729375a260fc 93,97-99
+  s_e83a5402cf255a::t_abd991e952e7cb 26-31
+tradingagents/ashare/recheck.py
+  s_e83a5402cf255a::t_8b10dfd80df51c 80-86
+tradingagents/ashare/run.py
+  s_e83a5402cf255a::t_e08eab4a8fe576 110-118,125-126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.43-trip",
+  "base_commit_sha": "f05cfe7582049fae7437375d333233c0886a0a63",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
