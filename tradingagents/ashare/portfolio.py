@@ -24,6 +24,7 @@ from pathlib import Path
 import yaml
 
 from tradingagents.ashare.material import fetch_daily_kline, fetch_symbol_kline
+from tradingagents.ashare.valuation import fair_value
 
 DEFAULT_TICKERS = "/Users/vega/git/ai-hedge-fund/config/tickers.yaml"
 SIGNAL_TO_FACTOR = {"清仓": 0.0, "止损": 0.0, "减仓": 0.6, "持有": 1.0, "观望": 1.0, "加仓": 1.0}
@@ -285,6 +286,24 @@ def render(port: dict, capital: float = 1_000_000) -> str:
 
     lines = [f"# 持仓状态与建议 · {as_of}", "",
              f"{risk} ｜ 持仓 {n_pos} 只 ｜ 股票市值 {equity/10000:.1f}万", ""]
+
+    # 2.5 估值锚：每只持仓 现价 vs 合理价（低估/高估），主源限流自动切新浪
+    vlines = []
+    for c, s in stats.items():
+        if not s["shares"] or not s["mark"]:
+            continue
+        v = fair_value(c, port.get("as_of") or as_of, name=s["name"])
+        if v:
+            src_mark = "·" if v["src"] == "sina" else ""
+            vlines.append((v["delta_pct"],
+                f"- {s['name']} {c} {v['price']:.1f} vs 合理 {v['fair_price']:.0f}"
+                f" {v['delta_pct']:+.0f}% {v['zone']}{src_mark}"))
+    if vlines:
+        lines += ["## 估值锚（现价 vs 合理价，ROE-PB 模型）"]
+        for _, l in sorted(vlines):
+            lines.append(l)
+        lines.append("· = 新浪源(akshare 限流时)")
+        lines.append("")
 
     # 1. 信号动作（LLM 交易员拍板；A股整手=100股，股数按整手给）
     def hands_text(sh: int) -> str:
