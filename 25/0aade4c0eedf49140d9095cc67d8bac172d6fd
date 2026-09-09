@@ -1,0 +1,24 @@
+scripts/val_verify_sina.py
+  s_e83a5402cf255a::t_acfc6a7be725a0 44-47,49,51,56-58,60-62,64
+  s_e83a5402cf255a::t_095dd395254eec 1-43,48,50,52-55,59,63,65-68
+tradingagents/ashare/valuation.py
+  s_e83a5402cf255a::t_61534b3682de34 28,33-63
+  s_e83a5402cf255a::t_d4d51446161e1a 92-93,107,109-110,112,128
+  s_e83a5402cf255a::t_d98361f1bc2ecd 138-148,154,156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.43-trip",
+  "base_commit_sha": "250aade4c0eedf49140d9095cc67d8bac172d6fd",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
