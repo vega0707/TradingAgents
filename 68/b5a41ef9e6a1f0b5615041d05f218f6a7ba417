@@ -1,0 +1,33 @@
+tradingagents/ashare/valuation.py
+  s_e83a5402cf255a::t_d35574c39ba682 145-149
+  s_e83a5402cf255a::t_fd7551a55b61e5 150-151
+  s_e83a5402cf255a::t_caddc9f9f5071b 171-173
+  s_e83a5402cf255a::t_49230515a3608a 139
+  s_e83a5402cf255a::t_af3325e5b58a72 129
+  s_e83a5402cf255a::t_780f323ce5fa6f 2,5,7-8,17,20,38-62
+  s_e83a5402cf255a::t_575b87be2b5412 92-93,107-108
+  s_e83a5402cf255a::t_8192b729d218eb 122-123,126,130,136-138,140-144,169
+  s_e83a5402cf255a::t_97f762283f047a 195-199,202
+  s_e83a5402cf255a::t_5db37eafa640f2 135
+  s_e83a5402cf255a::t_b4ab9901ab133a 153
+  s_e83a5402cf255a::t_7614153ef24733 120-121,124-125,132-133
+tradingagents/ashare/portfolio.py
+  s_e83a5402cf255a::t_aa47861b0672c2 27
+  s_e83a5402cf255a::t_b6eebbf9ee37e3 290-307
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.43-trip",
+  "base_commit_sha": "68b5a41ef9e6a1f0b5615041d05f218f6a7ba417",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
