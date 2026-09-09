@@ -52,6 +52,33 @@ Turso 库（libSQL / edge SQLite，多端共享）
   （`_cache/` 现有当日缓存降级为进程内/当日层，Turso 为持久真相）
 - 数据量：关注池 40 只 × 2500 根 ≈ 10 万行 ≈ 5MB——Turso 免费层毫无压力
 
+### Turso 配置获取（2026-09-09 状态：仅 OAuth 记录，无实际连接串）
+
+steel `cfg.properties` 只存了登录方式 `turso github:vega0707 (OAuth)`，
+**库 URL/token 未保存**，需登录一次获取（本机 turso CLI 未装）：
+
+```bash
+# 1. 安装并登录（GitHub OAuth 网页授权，账号 vega0707）
+brew install tursodatabase/tap/turso   # 或 curl -sSfL https://get.turso.tech/install.sh | bash
+turso auth login
+
+# 2. 建库 + 拿连接信息
+turso db create ashare                     # 库名建议 ashare
+turso db show ashare --url                  # → libsql://ashare-<org>.turso.io
+turso db tokens create ashare              # → 生成 token（保存好，只显示一次）
+
+# 3. 写入本地配置（gitignored）
+#    /Users/vega/git/TradingAgents/.env 增加：
+#    TURSO_URL=libsql://ashare-<org>.turso.io
+#    TURSO_TOKEN=<token>
+```
+
+- **安全**：token 能读写该库——**勿提交 git**（TradingAgents 若 public）。
+  Turso 控制台可随时 revoke 重建 token（行情库无个人数据，泄露可接受但应 revoke）
+- 云上 cursor：用同一 `TURSO_URL/TURSO_TOKEN`（或从其 .env 读），多端同库
+- 拿到连接串后建议回填 steel `cfg.properties`（`turso.dburl`/`turso.token`），
+  保持资源登记完整
+
 ## 四、数据源与限流经验（重要）
 
 | 源 | 用途 | 状态 |
@@ -81,8 +108,11 @@ Turso 库（libSQL / edge SQLite，多端共享）
 
 ## 六、实施步骤（给 cursor）
 
-0. **准备 Turso**：从 steel `cfg.properties` `turso` 段取 URL+token（或登录 turso.tech 建 db）；
-   `pip install libsql-experimental`（或 sqlalchemy-turso）；测试多端连接（本机/云上）
+0. **准备 Turso**：
+   - 本机装 turso CLI → `turso auth login`（GitHub OAuth，账号 vega0707）
+   - `turso db create ashare` → `db show --url` + `db tokens create` 拿连接串
+   - 写 `.env`：`TURSO_URL`/`TURSO_TOKEN`（gitignored；勿提交，见上节安全提示）
+   - `pip install libsql-experimental`（或 sqlalchemy-turso）；测试多端连接（本机/云上）
 1. **验证数据源长历史能力**（各 1 次请求，不批量）：
    - 腾讯 fqkline 指定起止日能否返回 2021 至今（~1250 根）
    - 新浪 datalen=1250 是否被截断
