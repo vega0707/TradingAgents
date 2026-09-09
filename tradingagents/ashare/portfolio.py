@@ -164,6 +164,31 @@ def vol_from_klines(klines: list[dict], n: int = 120) -> float:
     return math.sqrt(var) * math.sqrt(252)
 
 
+def avg_corr(pool: list[str], as_of: str) -> float | None:
+    """持仓日收益平均相关系数 → 同质化指标（>0.5 高度同步，分散不足）。"""
+    by_code = {c: returns_by_date(c, as_of) for c in pool}
+    common = sorted(set.intersection(*[set(r.keys()) for r in by_code.values()]))
+    if len(common) < 40:
+        return None
+    xs = {c: [by_code[c][d] for d in common] for c in pool}
+    n = len(common)
+
+    def pearson(a, b):
+        ma = sum(a) / n
+        mb = sum(b) / n
+        num = sum((a[i] - ma) * (b[i] - mb) for i in range(n))
+        da = math.sqrt(sum((x - ma) ** 2 for x in a))
+        db = math.sqrt(sum((x - mb) ** 2 for x in b))
+        return num / (da * db) if da and db else 0.0
+
+    vals = []
+    cs = list(pool)
+    for i in range(len(cs)):
+        for j in range(i + 1, len(cs)):
+            vals.append(pearson(xs[cs[i]], xs[cs[j]]))
+    return sum(vals) / len(vals) if vals else None
+
+
 def build_portfolio(holdings, signals, as_of: str) -> dict:
     """核心：返回权重方案 + 组合统计。"""
     # 1. 每票波动率（全走缓存）
@@ -234,11 +259,12 @@ def build_portfolio(holdings, signals, as_of: str) -> dict:
 
     # 5. 组合统计：目标权重按日历日对齐回放（样本内，仅参考）
     bt = backtest_stats(w, pool, as_of, scale=total_scale)
+    corr = avg_corr(pool, as_of)
 
     return {
         "as_of": as_of, "risk_on": risk_on, "hs300": hs300,
         "total_scale": total_scale, "w": w, "stats": stats,
-        "pool": pool, **bt,
+        "pool": pool, "corr": corr, **bt,
     }
 
 
@@ -305,6 +331,12 @@ def render(port: dict, capital: float = 1_000_000) -> str:
             warns.append(f"◐ {s['name']} 占 {pct:.0f}%——偏集中，留意即可（非必须动作）")
     if not port["risk_on"]:
         warns.append("⚠️ 大盘在 MA200 下方：历史上此阶段满仓的 MDD 接近翻倍，降仓是纪律不是预测")
+    corr = port.get("corr")
+    if corr is not None and corr > 0.5:
+        warns.append(f"⚠️ 持仓平均相关系数 {corr:.2f}——高度同质（红利/基建/金融同涨同跌），"
+                     "真正的分散要靠加低相关资产（消费/医药/资源），池内调权重没用")
+    elif corr is not None:
+        warns.append(f"持仓平均相关 {corr:.2f}——分散度尚可")
     if warns:
         lines += ["## 风险提示", *warns, ""]
 

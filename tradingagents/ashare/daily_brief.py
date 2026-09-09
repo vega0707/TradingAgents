@@ -117,44 +117,95 @@ def tx_quotes(codes: list[str]) -> dict[str, dict]:
     return out
 
 
-def deep_dive(cands: list[dict], as_of: str) -> list[str]:
-    """对候选逐只跑完整深析（run.py 全管线）→ 推荐行。
+def _already_deep(code: str, as_of: str, days: int = 3) -> str | None:
+    """近 days 天该候选是否已深析 → 返回日期或 None（去重，不重复花 LLM）。"""
+    best = None
+    for d in Path("ashare_out").glob(f"{code}-*"):
+        if d.is_dir() and (d / "record.json").is_file():
+            a = d.name.rsplit("-", 1)[-1]
+            if a < as_of and (best is None or a > best):
+                best = a
+    if best:
+        from datetime import datetime
+        d1 = datetime.strptime(best, "%Y-%m-%d").date()
+        d2 = datetime.strptime(as_of, "%Y-%m-%d").date()
+        if (d2 - d1).days <= days:
+            return best
+    return None
 
-    每只独立子进程（约 5-7 分钟），产出落 ashare_out/{code}-{as_of}/。
-    """
+
+def deep_one(code: str, name: str, as_of: str) -> str:
+    """单只完整深析 → 推荐行文本。"""
+    import json
     import subprocess
     import sys as _sys
 
-    out: list[str] = []
+    print(f"[深析] {name} {code} ({as_of}) …", flush=True)
+    r = subprocess.run(
+        [_sys.executable, "-m", "tradingagents.ashare.run",
+         "--ticker", code, "--name", name, "--date", as_of,
+         "--force", "--no-cloud"],
+        capture_output=True, text=True, timeout=900,
+    )
+    rec_p = Path("ashare_out") / f"{code}-{as_of}" / "record.json"
+    if not rec_p.exists():
+        return f"- **{name} {code}**：深析失败（{(r.stdout + r.stderr)[-200:]}）"
+    rec = json.loads(rec_p.read_text(encoding="utf-8"))
+    t = rec.get("trader") or {}
+    m = rec.get("manager") or {}
+    act = t.get("action", "?")
+    tag = {"建仓": "🟢 可入", "加仓": "🟢 可入", "持有": "◐ 持有", "观望": "◐ 观望",
+           "减仓": "🔴 回避", "清仓": "🔴 回避", "止损": "🔴 回避"}.get(act, act)
+    reason = (t.get("reasoning") or "")[:130]
+    levels = (t.get("levels") or "")[:80]
+    out = [f"- **{name} {code}** 现价 {rec.get('mark')} ｜ {tag}"
+           f"（交易员:{act} 研经:{m.get('recommendation')}({m.get('confidence')})）"]
+    if reason:
+        out.append(f"  理由：{reason}")
+    if levels:
+        out.append(f"  关键位：{levels}")
+    return "\n".join(out)
+
+
+def deep_dive(cands: list[dict], as_of: str) -> tuple[list[str], int, int]:
+    """并行深析候选（去重+预热财务+2路 LLM）。返回 (行, 成功数, 失败数)。"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    # 去重：近 3 天深析过的跳过
+    todo = []
     for c in cands:
-        code = c["code"]
-        name = c["name"]
-        print(f"\n[深析] {name} {code} ({as_of}) …", flush=True)
-        r = subprocess.run(
-            [_sys.executable, "-m", "tradingagents.ashare.run",
-             "--ticker", code, "--name", name, "--date", as_of,
-             "--force", "--no-cloud"],
-            capture_output=True, text=True, timeout=900,
-        )
-        rec_p = Path("ashare_out") / f"{code}-{as_of}" / "record.json"
-        if not rec_p.exists():
-            out.append(f"- **{name} {code}**：深析失败（{(r.stdout+r.stderr)[-200:]}）")
-            continue
-        rec = json.loads(rec_p.read_text(encoding="utf-8"))
-        t = rec.get("trader") or {}
-        m = rec.get("manager") or {}
-        act = t.get("action", "?")
-        tag = {"建仓": "🟢 可入", "加仓": "🟢 可入", "持有": "◐ 持有", "观望": "◐ 观望",
-               "减仓": "🔴 回避", "清仓": "🔴 回避", "止损": "🔴 回避"}.get(act, act)
-        reason = (t.get("reasoning") or "")[:130]
-        levels = (t.get("levels") or "")[:80]
-        out.append(f"- **{name} {code}** 现价 {rec.get('mark')} ｜ {tag}"
-                   f"（交易员:{act} 研经:{m.get('recommendation')}({m.get('confidence')})）")
-        if reason:
-            out.append(f"  理由：{reason}")
-        if levels:
-            out.append(f"  关键位：{levels}")
-    return out
+        done = _already_deep(c["code"], as_of)
+        if done:
+            print(f"[跳过] {c['name']} {c['code']} 近 3 天({done})已深析", flush=True)
+        else:
+            todo.append(c)
+    if not todo:
+        return [], 0, 0
+
+    # 预热：财务快照串行种缓存（防并发打爆 datacenter 源）
+    from tradingagents.ashare.material import build_material
+    warmed = []
+    for c in todo:
+        try:
+            m = build_material(c["code"], as_of, c["name"])
+            if m.fundamentals_ok:
+                warmed.append(c)
+                print(f"[预热] {c['name']} 财务 OK", flush=True)
+            else:
+                print(f"[预热] {c['name']} 基本面缺失仍尝试深析", flush=True)
+                warmed.append(c)
+        except Exception as e:  # noqa: BLE001
+            print(f"[预热] {c['name']} 失败({str(e)[:80]})，仍深析", flush=True)
+            warmed.append(c)
+
+    results = []
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        futs = {ex.submit(deep_one, c["code"], c["name"], as_of): c for c in warmed}
+        for f in futs:
+            results.append(f.result())
+    ok = sum(1 for x in results if "深析失败" not in x)
+    fail = len(results) - ok
+    return results, ok, fail
 
 
 def main() -> None:
@@ -230,9 +281,13 @@ def main() -> None:
         print("\n".join(md))
         return
 
-    # --deep：对候选跑完整 LLM 深析（run.py 全管线），输出入手推荐
-    deep = deep_dive([c for c in cands if c["code"]][: args.deep], args.date)
-    md += ["", "## 候选深析 · 交易员推荐（完整管线 10 大师+辩论）", ""]
+    # --deep：对候选跑完整 LLM 深析（run.py 全管线，去重+预热+2路并行）
+    deep, ok_n, fail_n = deep_dive([c for c in cands if c["code"]][: args.deep], args.date)
+    if not deep:
+        print("候选均近 3 天已深析 → 无新深析，跳过推荐")
+        return
+    md += ["", f"## 候选深析 · 交易员推荐（完成 {ok_n}/{ok_n+fail_n} 只" +
+           (f"，{fail_n} 只失败" if fail_n else "") + "）", ""]
     for r in deep:
         md.append(r)
     md.append("\n> 深析结果基于基本面快照；买入前请自行确认与组合匹配。")
