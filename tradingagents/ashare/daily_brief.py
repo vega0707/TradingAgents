@@ -52,21 +52,37 @@ def fetch_feed(pages: int = 4) -> list[str]:
 
 
 def code_table() -> dict[str, str]:
-    """全市场 {公司名: 代码}，当日缓存（akshare 一次拉全）。"""
+    """全市场 {公司名: 代码}。缓存放宽 7 天 + akshare 失败用旧缓存兜底。
+
+    教训(2026-09-10)：当日缓存隔天必重拉，akshare 连不上时 5 次退避重试
+    卡死早盘任务——A 股代码表月度级变化，7 天缓存足够；失败读旧缓存。
+    """
+    cache = None
     if CODE_CACHE.is_file():
         try:
-            blob = json.loads(CODE_CACHE.read_text(encoding="utf-8"))
-            if blob.get("day") == time.strftime("%Y-%m-%d"):
-                return blob["data"]
+            cache = json.loads(CODE_CACHE.read_text(encoding="utf-8"))
+        except Exception:
+            cache = None
+    if cache:
+        from datetime import datetime
+        try:
+            saved = datetime.strptime(cache.get("day", ""), "%Y-%m-%d").date()
+            if (datetime.now().date() - saved).days < 7:
+                return cache["data"]
         except Exception:
             pass
-    import akshare as ak
-    df = ak.stock_info_a_code_name()
-    data = {str(r["name"]).strip(): str(r["code"]) for _, r in df.iterrows()}
-    CODE_CACHE.parent.mkdir(parents=True, exist_ok=True)
-    CODE_CACHE.write_text(json.dumps({"day": time.strftime("%Y-%m-%d"), "data": data},
-                                     ensure_ascii=False), encoding="utf-8")
-    return data
+    try:
+        import akshare as ak
+        df = ak.stock_info_a_code_name()
+        data = {str(r["name"]).strip(): str(r["code"]) for _, r in df.iterrows()}
+        CODE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        CODE_CACHE.write_text(json.dumps({"day": time.strftime("%Y-%m-%d"), "data": data},
+                                         ensure_ascii=False), encoding="utf-8")
+        return data
+    except Exception:
+        if cache and cache.get("data"):
+            return cache["data"]   # akshare 挂 → 旧代码表兜底（代码表月级稳定）
+        raise
 
 
 def resolve_names(names: list[str], table: dict[str, str]) -> list[tuple[str, str]]:
@@ -118,19 +134,29 @@ def tx_quotes(codes: list[str]) -> dict[str, dict]:
 
 
 def _already_deep(code: str, as_of: str, days: int = 3) -> str | None:
-    """近 days 天该候选是否已深析 → 返回日期或 None（去重，不重复花 LLM）。"""
+    """近 days 天该候选是否已深析 → 返回日期或 None（去重，不重复花 LLM）。
+
+    目录名 {code}-YYYY-MM-DD 定长切分（不能 rsplit——日期含连字符，同
+    make_daily_card 教训；2026-09-10 曾 rsplit 出 '10' 致 strptime 崩）。
+    """
+    from datetime import datetime
+    try:
+        asof = datetime.strptime(as_of, "%Y-%m-%d").date()
+    except ValueError:
+        return None
     best = None
     for d in Path("ashare_out").glob(f"{code}-*"):
-        if d.is_dir() and (d / "record.json").is_file():
-            a = d.name.rsplit("-", 1)[-1]
-            if a < as_of and (best is None or a > best):
-                best = a
-    if best:
-        from datetime import datetime
-        d1 = datetime.strptime(best, "%Y-%m-%d").date()
-        d2 = datetime.strptime(as_of, "%Y-%m-%d").date()
-        if (d2 - d1).days <= days:
-            return best
+        if not d.is_dir() or not (d / "record.json").is_file():
+            continue
+        a = d.name[-10:]  # 定长取 YYYY-MM-DD
+        try:
+            da = datetime.strptime(a, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if da < asof and (best is None or da > best):
+            best = da
+    if best and (asof - best).days <= days:
+        return best.isoformat()
     return None
 
 
