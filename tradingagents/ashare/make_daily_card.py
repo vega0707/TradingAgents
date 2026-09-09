@@ -56,12 +56,24 @@ def load_records(as_of: str | None = None) -> list[tuple[str, str, dict, dict]]:
     return out
 
 
-def action_signals(as_of: str | None = None) -> list[str]:
-    """有调仓信号的行（"名称 代码: 动作"）；全持有/观望返回空列表。"""
+def action_signals(as_of: str | None = None, holdings_only: bool = True) -> list[str]:
+    """有调仓信号的行（"名称 代码: 动作"）；全持有/观望返回空列表。
+
+    holdings_only=True（默认）只报持仓票——晨报深析的候选票(非持仓，
+    如建仓建议)走早盘推荐推送，不混进持仓决策单。
+    """
+    import yaml
+    hold = set()
+    if holdings_only:
+        try:
+            d = yaml.safe_load(Path("/Users/vega/git/ai-hedge-fund/config/tickers.yaml").read_text(encoding="utf-8"))
+            hold = {t["code"] for t in d["tickers"] if float(t.get("shares") or 0) > 0}
+        except Exception:
+            hold = set()
     out = []
     for code, _d, rec, _dec in load_records(as_of):
         act = (rec.get("trader") or {}).get("action", "")
-        if act in SIGNAL_ACTIONS:
+        if act in SIGNAL_ACTIONS and (not holdings_only or code in hold):
             out.append(f"{rec.get('name') or code} {code}: {act}")
     return out
 

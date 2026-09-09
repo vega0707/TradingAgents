@@ -88,7 +88,9 @@ fi
   fi
 } > /tmp/ashare-daily.md
 cp /tmp/ashare-daily.md "logs/daily-${DATE}.md"
-echo "[$DATE] 有交易动作 → 推决策单（调仓:$HAS_TRADE 信号:$([ -n "$SIGNALS" ] && echo 有 || echo 无) 观察池:$WL_HIT）" >> "$LOG"
+SIG_TAG="无"
+if [[ -n "$SIGNALS" ]]; then SIG_TAG="有"; fi
+echo "[$DATE] 有交易动作 → 推决策单(调仓=$HAS_TRADE 信号=$SIG_TAG 观察池=$WL_HIT)" >> "$LOG"
 
 # 5. 推送每日决策单
 if [[ -s /tmp/ashare-daily.md ]]; then

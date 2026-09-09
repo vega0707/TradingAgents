@@ -134,7 +134,7 @@ def main() -> None:
             print(f"[{'深析' if go else '沿用'}] {h['code']} {h['name']}: {why}")
             if go:
                 hits.append(h["code"])
-        print(f"\nTRIGGERED={','.join(hits)}  ({len(hits)}/{len(holdings)} 只需深析)")
+        print(f"TRIGGERED={','.join(hits)}")
         return
 
     if args.portfolio:
