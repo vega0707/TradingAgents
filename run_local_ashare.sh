@@ -86,6 +86,12 @@ fi
     echo "$WL_OUT"
     echo "$WL_OUT" > "logs/watchlist-${DATE}.md" 2>/dev/null || true
   fi
+  # 信号反转警示：基本面未变的隔天反转 = 疑似噪音，防止用户被打脸
+  RECHECK=$($PY -m tradingagents.ashare.recheck 2>/dev/null)
+  if [[ "$RECHECK" == *"⚠️"* ]]; then
+    echo ""
+    echo "$RECHECK"
+  fi
 } > /tmp/ashare-daily.md
 cp /tmp/ashare-daily.md "logs/daily-${DATE}.md"
 SIG_TAG="无"
