@@ -23,6 +23,12 @@ CREATE TABLE IF NOT EXISTS kline(
   open REAL, high REAL, low REAL, close REAL, volume REAL,
   PRIMARY KEY(code, date));
 CREATE INDEX IF NOT EXISTS idx_kline_code ON kline(code, date);
+CREATE TABLE IF NOT EXISTS signal_case(
+  code TEXT NOT NULL, name TEXT,
+  prev_date TEXT, prev_action TEXT, cur_date TEXT, cur_action TEXT,
+  days INTEGER, fundamental_changed INTEGER, kind TEXT DEFAULT 'flip',
+  created TEXT DEFAULT (datetime('now','localtime')),
+  PRIMARY KEY(code, cur_date, prev_date));
 """
 
 
@@ -64,6 +70,37 @@ def migrate_from_cache() -> None:
             print(f"  {f.name} 失败: {e}")
     conn.close()
     print(f"迁移完成: {files} 文件 → {total} 根K线 (db={DB})")
+
+
+def record_signal_case(code: str, name: str, prev_date: str, prev_action: str,
+                       cur_date: str, cur_action: str, days: int,
+                       fundamental_changed: bool = False) -> None:
+    """反转入库：自我迭代案例库（recheck 检测到反转时调用）。"""
+    try:
+        conn = connect()
+        conn.execute(
+            "INSERT OR REPLACE INTO signal_case(code,name,prev_date,prev_action,"
+            "cur_date,cur_action,days,fundamental_changed) VALUES(?,?,?,?,?,?,?,?)",
+            (code, name, prev_date, prev_action, cur_date, cur_action, days,
+             1 if fundamental_changed else 0))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def flip_history(code: str, asof: str, window_days: int = 90) -> int:
+    """该票在 asof 之前 window_days 内的信号反转次数（run.py 一致性注入用）。"""
+    try:
+        conn = connect()
+        n = conn.execute(
+            "SELECT COUNT(*) FROM signal_case WHERE code=? AND cur_date < ? "
+            "AND cur_date >= date(?, ?)",
+            (code, asof, asof, f"-{window_days} day")).fetchone()[0]
+        conn.close()
+        return n
+    except Exception:
+        return 0
 
 
 def stats() -> None:

@@ -107,13 +107,23 @@ def main() -> None:
     # 上次判断注入：基本面未更新时防日度价格噪声翻转结论（9/8 建筑 加仓→9/9 减仓 教训）
     prev = _last_judgment(args.ticker, as_of)
     if prev:
+        # 历史反转次数注入（自我迭代案例库）
+        try:
+            from tradingagents.ashare.db import flip_history
+            flips = flip_history(args.ticker, as_of)
+        except Exception:
+            flips = 0
+        flips_note = (f"\n历史提醒：该票近期检测到 {flips} 次信号反转（基本面未变却翻转方向）——"
+                      "若你本次倾向改变方向，须格外说明新证据，否则视为信号不稳。"
+                      if flips else "")
         mat.prev_note = (
             f"【一致性要求】上次分析（{prev['asof']}）结论：交易员 {prev['action']}"
             f"（研经 {prev['rec']}），要点：{prev['reason']}\n"
             "本次基本面快照未更新（同一报告期，21 天窗口内）。除非出现显著新证据"
             "（财报披露/重大公告/基本面实质变化），不要仅因日度价格波动或均线穿破就"
             "翻转买卖方向——若改变结论，请明确列出相对上次的新证据；没有则应维持方向，"
-            "最多调整仓位建议。技术位只决定执行时机，不推翻基本面方向。")
+            "最多调整仓位建议。技术位只决定执行时机，不推翻基本面方向。"
+            + flips_note)
     print(f"      现价 {mat.mark}，基本面{'可用' if mat.fundamentals_ok else '不可用(ETF/缺失)'}"
           f"{'，带上次判断' if prev else ''}", flush=True)
 

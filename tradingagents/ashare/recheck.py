@@ -77,6 +77,13 @@ def main() -> None:
             "days": days,
             "warn": days <= 25,   # <25 天反转且基本面无新财报窗口 → 疑似噪音
         })
+        # 自我迭代：反转入案例库（供后续分析注入该票信号不稳信息）
+        try:
+            from tradingagents.ashare.db import record_signal_case
+            record_signal_case(code, t.get("name", ""), prev["_asof"], pa,
+                               cur["_asof"], ca, days, fundamental_changed=False)
+        except Exception:
+            pass
     if not rev:
         print("✅ 无信号反转（或仅一次 record）")
         return
