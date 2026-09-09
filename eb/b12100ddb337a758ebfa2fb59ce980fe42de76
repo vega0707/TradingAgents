@@ -1,0 +1,23 @@
+run_local_ashare.sh
+  s_e83a5402cf255a::t_d285d8dfb0d4d3 91-93
+tradingagents/ashare/make_daily_card.py
+  s_e83a5402cf255a::t_63d68eb8e0e563 59-72,76
+tradingagents/ashare/daily_flow.py
+  s_e83a5402cf255a::t_50f8ee8db0184b 137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.43-trip",
+  "base_commit_sha": "ebb12100ddb337a758ebfa2fb59ce980fe42de76",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
