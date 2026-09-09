@@ -54,6 +54,35 @@ def build_card(mat, rec) -> str:
     return "\n".join(l for l in lines if l)
 
 
+def _last_judgment(ticker: str, as_of: str) -> dict | None:
+    """该票 < as_of 的最近一次 record 判断摘要（供一致性注入）。"""
+    best = None
+    for d in Path("ashare_out").glob(f"{ticker}-*"):
+        if not d.is_dir():
+            continue
+        rp = d / "record.json"
+        if not rp.exists():
+            continue
+        try:
+            rec = json.loads(rp.read_text(encoding="utf-8"))
+            a = rec.get("as_of") or d.name.rsplit("-", 1)[-1]
+            if a >= as_of:
+                continue
+            if best is None or a > best["asof"]:
+                best = {"asof": a, "rec": rec}
+        except Exception:
+            continue
+    if best is None:
+        return None
+    rec = best["rec"]
+    return {
+        "asof": best["asof"],
+        "action": (rec.get("trader") or {}).get("action", "?"),
+        "rec": (rec.get("manager") or {}).get("recommendation", "?"),
+        "reason": ((rec.get("trader") or {}).get("reasoning") or "")[:120],
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="TradingAgents A股 单票研究")
     ap.add_argument("--ticker", required=True)
@@ -75,8 +104,18 @@ def main() -> None:
     t0 = time.time()
     print(f"[1/3] 拉取 {args.ticker} 数据（截至 {as_of}）…", flush=True)
     mat = build_material(args.ticker, as_of, args.name)
-    print(f"      现价 {mat.mark}，基本面{'可用' if mat.fundamentals_ok else '不可用(ETF/缺失)'}",
-          flush=True)
+    # 上次判断注入：基本面未更新时防日度价格噪声翻转结论（9/8 建筑 加仓→9/9 减仓 教训）
+    prev = _last_judgment(args.ticker, as_of)
+    if prev:
+        mat.prev_note = (
+            f"【一致性要求】上次分析（{prev['asof']}）结论：交易员 {prev['action']}"
+            f"（研经 {prev['rec']}），要点：{prev['reason']}\n"
+            "本次基本面快照未更新（同一报告期，21 天窗口内）。除非出现显著新证据"
+            "（财报披露/重大公告/基本面实质变化），不要仅因日度价格波动或均线穿破就"
+            "翻转买卖方向——若改变结论，请明确列出相对上次的新证据；没有则应维持方向，"
+            "最多调整仓位建议。技术位只决定执行时机，不推翻基本面方向。")
+    print(f"      现价 {mat.mark}，基本面{'可用' if mat.fundamentals_ok else '不可用(ETF/缺失)'}"
+          f"{'，带上次判断' if prev else ''}", flush=True)
 
     if record_exists(args.ticker, as_of) and not args.force and not args.no_save:
         print(f"✋ {args.ticker}@{as_of} 已有 record.json——防污染拒绝重跑；确需覆盖加 --force")

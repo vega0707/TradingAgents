@@ -179,10 +179,14 @@ class Material:
     price_text: str
     mark: float | None
     fundamentals_ok: bool
+    prev_note: str = ""  # 上次判断上下文（复查防日度噪声翻转），空=首析
 
     def render(self) -> str:
         head = f"标的：{self.name} {self.ticker} ｜ 分析截至 {self.as_of}（收盘）\n"
-        return head + "\n" + self.price_text + "\n\n" + self.fundamentals
+        body = head + "\n" + self.price_text + "\n\n" + self.fundamentals
+        if self.prev_note:
+            body += "\n\n" + self.prev_note
+        return body
 
 
 def build_material(ticker: str, as_of: str, name: str = "") -> Material:
