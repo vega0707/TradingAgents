@@ -38,28 +38,34 @@ BOND_LIKE = ("电力", "燃气", "水务", "高速", "公路", "港口", "机场
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/126.0"}
 
 
-def sina_metrics(code: str, year: int = 2025) -> dict | None:
-    """新浪财务指标页(GBK) → {roe, bvps}。akshare 限流时的独立 fallback。"""
-    try:
-        url = (f"https://money.finance.sina.com.cn/corp/go.php/vFD_FinancialGuideLine/"
-               f"stockid/{code}/ctrl/{year}/displaytype/4.phtml")
-        raw = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=15).read()
-        text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw.decode("gbk", "replace")))
+def sina_metrics(code: str, year: int | None = None) -> dict | None:
+    """新浪财务指标页(GBK) → {roe, bvps}。akshare 限流时的独立 fallback。
 
-        def grab(kw):
-            i = text.find(kw)
-            if i < 0:
-                return None
-            seg = text[i:i + 60].split(kw, 1)[1]
-            m = re.search(r"[\d.]+", seg)
-            return float(m.group()) if m else None
+    year 传 None 时自动试 当前年 → 上年（新财年披露前当年页无数据）。
+    """
+    from datetime import datetime
+    years = [year] if year else [datetime.now().year, datetime.now().year - 1]
+    for yr in years:
+        try:
+            url = (f"https://money.finance.sina.com.cn/corp/go.php/vFD_FinancialGuideLine/"
+                   f"stockid/{code}/ctrl/{yr}/displaytype/4.phtml")
+            raw = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=15).read()
+            text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw.decode("gbk", "replace")))
 
-        roe, bvps = grab("净资产收益率(%)"), grab("每股净资产_调整前(元)")
-        if roe and bvps:
-            return {"roe": roe / 100, "bvps": bvps, "g": 0.0}
-        return None
-    except Exception:
-        return None
+            def grab(kw):
+                i = text.find(kw)
+                if i < 0:
+                    return None
+                seg = text[i:i + 60].split(kw, 1)[1]
+                m = re.search(r"[\d.]+", seg)
+                return float(m.group()) if m else None
+
+            roe, bvps = grab("净资产收益率(%)"), grab("每股净资产_调整前(元)")
+            if roe and bvps:
+                return {"roe": roe / 100, "bvps": bvps, "g": 0.0}
+        except Exception:
+            continue
+    return None
 
 
 def annual_vol(code: str, as_of: str, n: int = 120) -> float:
