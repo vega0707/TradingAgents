@@ -215,6 +215,7 @@ def build_portfolio(holdings, signals, as_of: str) -> dict:
             "ma20": _ma(20), "ma60": _ma(60),          # 右侧/触发位判断
             "prev": closes[-2] if n >= 2 else None,     # 上穿判断
             "ma20_y": (sum(closes[-21:-1]) / 20) if n >= 21 else None,
+            "hi60": max(closes[-60:]) if n >= 60 else None,  # 价格闸
         }
         if code in signals:
             sig = signals[code]
@@ -307,9 +308,13 @@ def render(port: dict, capital: float = 1_000_000) -> str:
                 cut = (sh // 2) // 100 * 100
                 actions.append(f"- 🟡 **{s['name']} {c}** 减仓：现有 {hands_text(sh)}，建议先减 {cut//100} 手({cut} 股)观察")
         elif act == "加仓":
-            # 右侧是否建立：收盘站上 MA20 且昨在上方（连续）→ 已确认；否则给触发位
+            # 价格闸：贴 60 日高（<5%）→ 高位不喊加（防逢高加仓）
+            hi60 = s.get("hi60")
+            at_high = bool(hi60 and s["mark"] and (hi60 - s["mark"]) / hi60 < 0.05)
             right_now = bool(s.get("prev") is not None and ma20 and s["mark"] >= ma20)
-            if right_now:
+            if at_high:
+                actions.append(f"- ⏸️ **{s['name']} {c}** 加仓信号：⚠️ 贴 60 日高({hi60:.2f})——高位暂缓追加，等回踩")
+            elif right_now:
                 actions.append(f"- 🟢 **{s['name']} {c}** 加仓：现有 {hands_text(sh)} ｜ ✅ 右侧建立（站上 MA20 {ma20:.2f}）——可分批加")
             else:
                 dip = f"回踩加仓位 ≈ MA60×0.88 = {ma60*0.88:.2f}" if ma60 else ""
