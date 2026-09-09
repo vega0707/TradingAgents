@@ -224,3 +224,4 @@ reports/
 
 # ashare 运行产物（决策记录/对账/云端缓存数据）
 ashare_out/
+data/

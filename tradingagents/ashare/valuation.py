@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
 import statistics
 import sys
 import urllib.request
@@ -30,6 +31,7 @@ REQ_RETURN = 0.10   # 默认要求回报率 r（被 asset_r 覆盖）
 PB_FLOOR = 0.30     # 合理 PB 下限（防低 ROE 极端）
 PB_CAP = 10.0
 SNAP_CACHE = Path("ashare_out") / "_cache" / "val-snap.json"
+DB_PATH = Path(__file__).resolve().parents[2] / "data" / "market.db"
 
 # 类债资产（公用事业/运营商/收租型）：市场接受低要求回报（r≈6%），
 # 用 ROE-PB 高 r 会误判"高估"（长电 2.9PB 案例）。
@@ -66,6 +68,28 @@ def sina_metrics(code: str, year: int | None = None) -> dict | None:
         except Exception:
             continue
     return None
+
+
+def pb_percentile(code: str, cur_pb: float, bvps: float, min_rows: int = 60) -> Optional[float]:
+    """当前 PB 在自身历史中的分位（本地 SQLite，零外部请求）。
+
+    简化版：历史 PB = 历史收盘价 / 当前 BVPS（忽略 BVPS 历史变化，
+    近似足够看估值中枢；PIT 精确版待 bvps_history 表就绪后升级）。
+    返回 0-100 分位；<20 低位，>80 高位。历史不足返回 None。
+    """
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        rows = conn.execute(
+            "SELECT close FROM kline WHERE code=? ORDER BY date", (code,)).fetchall()
+        conn.close()
+        closes = [r[0] for r in rows if r[0]]
+        if len(closes) < min_rows or not bvps:
+            return None
+        pb_hist = [c / bvps for c in closes]
+        below = sum(1 for x in pb_hist if x <= cur_pb)
+        return below / len(pb_hist) * 100
+    except Exception:
+        return None
 
 
 def annual_vol(code: str, as_of: str, n: int = 120) -> float:
@@ -182,6 +206,8 @@ def fair_value(code: str, as_of: str, name: str = "", snap=None,
         fair_pb = max(PB_FLOOR, min(fair_pb, PB_CAP))
         fair_price = fair_pb * bvps
         cur_pb = px / bvps
+        # PB 历史分位（本地 SQLite 历史价 ÷ 当前 BVPS，近似）
+        pct = pb_percentile(code, cur_pb, bvps)
         delta = (px / fair_price - 1) * 100
         zone = "🔥高估" if delta > 30 else ("偏高" if delta > 10 else
                ("⚖️合理" if delta > -15 else ("低估" if delta > -30 else "🧊深度低估")))
