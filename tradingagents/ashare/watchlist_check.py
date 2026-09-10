@@ -36,7 +36,8 @@ def kline_state(code: str, as_of: str) -> dict | None:
             return sum(seg) / len(seg)
 
         return {"px": px, "prev": closes[-2], "ma20": ma(20, n - 1),
-                "ma20_y": ma(20, n - 2), "ma60": ma(60, n - 1)}
+                "ma20_y": ma(20, n - 2), "ma60": ma(60, n - 1),
+                "hi60_prev": max(closes[-61:-1]) if n >= 61 else None}
     except Exception:
         return None
 
@@ -75,11 +76,16 @@ def main() -> None:
             if st["ma20_y"] and st["prev"] < st["ma20_y"] and px >= st["ma20"]:
                 fired = True
                 note = f"上穿 MA20({st['ma20']:.2f}) 右侧动量信号"
+        elif tt == "high60_break":
+            hp = st.get("hi60_prev")
+            if hp and px > hp:
+                fired = True
+                note = f"突破 60 日新高({hp:.2f}) 强趋势信号"
         elif tt == "dip_buy":
             target = st["ma60"] * DIP
             if px <= target:
                 fired = True
-                note = f"深跌乖离买点（价 {px:.2f} ≤ MA60×0.92 = {target:.2f}）"
+                note = f"深跌乖离买点（价 {px:.2f} ≤ MA60×0.88 = {target:.2f}）"
         cur_state[code] = fired
         risk = w.get("risk_line")
         risk_hit = bool(risk and px < risk)

@@ -1,38 +1,70 @@
-# watchlist.yaml — 非持仓观察池，每票绑定回测验证过的触发类型
-# （2026-09-08 广度回测 35 只 2 年：dip_buy 深跌乖离普适有效；
-#   阈值越深胜率越高：-15% +7.1%胜77% / -12% +5.3%胜77% / -8% +2.9%胜68%。
-#   观察池用 -12% 档（平衡触发频率）；追新高 high60 是坑，不用。）
+# watchlist.yaml — 观察池：持仓外候选，每票绑定回测验证过的触发类型
+# 入池规则：bt_triggers 三种触发(ma20_cross/high60_break/dip_buy)至少一种
+# 正超额才入（回测拒了润泽科技 300442：三触发全负）。
 # trigger_type:
-#   dip_buy     现价 ≤ MA60×0.88（乖离 -12%）→ 机会型超跌买点
-#   ma20_cross  收盘上穿 MA20 → 右侧动量（仅北湾港回测有效）
+#   dip_buy     现价 ≤ MA60×0.88（深跌乖离 -12%）→ 超跌买点（弱势市主力有效）
+#   ma20_cross  收盘上穿 MA20 → 右侧动量
+#   high60_break 收盘突破 60 日新高 → 强趋势票专用（601138 回测 +17.6%胜86%）
 watchlist:
+  # —— 2026-09-08 入池（稀土/公路/医药/港口）——
   - code: "000970"
     name: 中科三环
     added: "2026-09-08"
-    thesis: "稀土永磁龙头 PB2.2；深析观望但深跌后均值回归最强(dip_buy +3.9%胜79%)"
+    thesis: "稀土永磁 PB2.2；dip_buy +3.9%胜79%"
     trigger_type: dip_buy
     risk_line: 10.6
   - code: "600548"
     name: 深高速
     added: "2026-09-08"
-    thesis: "公路破净 PB0.9 高股息；dip_buy +2.2%胜71% 回测有效；未深析"
+    thesis: "公路破净 PB0.9 高股息；dip_buy +2.2%胜71%"
     trigger_type: dip_buy
     risk_line: null
   - code: "600196"
     name: 复星医药
     added: "2026-09-08"
-    thesis: "医疗低 PB1.2；dip_buy +4.8%胜81% 观察池最强；未深析"
+    thesis: "医疗低 PB1.2；dip_buy +4.8%胜81%（观察池最强）"
     trigger_type: dip_buy
     risk_line: null
   - code: "600332"
     name: 白云山
     added: "2026-09-08"
-    thesis: "中药破净 PB0.84；dip_buy 弱正；防御候选"
+    thesis: "中药破净 PB0.84 防御；dip_buy 弱正"
     trigger_type: dip_buy
     risk_line: null
   - code: "000582"
     name: 北部湾港
     added: "2026-09-08"
-    thesis: "港口；唯 ma20_cross 有效(+1.8%胜68%)，追新高大亏——仅右侧动量"
+    thesis: "港口；唯 ma20_cross 有效(+1.8%胜68%)"
     trigger_type: ma20_cross
+    risk_line: null
+  # —— 2026-09-10 入池（金融强国/AI算力候选，回测筛选）——
+  - code: "600030"
+    name: 中信证券
+    added: "2026-09-10"
+    thesis: "券商龙头 PB1.45 政策受益；dip_buy +3.9%@20 胜95%（最强档）"
+    trigger_type: dip_buy
+    risk_line: null
+  - code: "601138"
+    name: 工业富联
+    added: "2026-09-10"
+    thesis: "AI服务器龙头；high60_break +17.6%@20 胜86%（强趋势票）"
+    trigger_type: high60_break
+    risk_line: null
+  - code: "300418"
+    name: 昆仑万维
+    added: "2026-09-10"
+    thesis: "AI应用；dip_buy +4.4%@20 胜72%"
+    trigger_type: dip_buy
+    risk_line: null
+  - code: "002335"
+    name: 科华数据
+    added: "2026-09-10"
+    thesis: "数据中心/电源 PB3.46；ma20_cross +4.7%@20"
+    trigger_type: ma20_cross
+    risk_line: null
+  - code: "300059"
+    name: 东方财富
+    added: "2026-09-10"
+    thesis: "互联网券商政策受益；dip_buy 弱正(+0.2%@20 胜82%)——观察为主"
+    trigger_type: dip_buy
     risk_line: null
