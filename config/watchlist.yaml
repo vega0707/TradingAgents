@@ -68,3 +68,16 @@ watchlist:
     thesis: "互联网券商政策受益；dip_buy 弱正(+0.2%@20 胜82%)——观察为主"
     trigger_type: dip_buy
     risk_line: null
+  # —— 2026-09-10 入池（银行板块：政策+低估值，回测筛选）——
+  - code: "600919"
+    name: 江苏银行
+    added: "2026-09-10"
+    thesis: "银行 PB0.62 区域行；dip_buy +4.9%@20 胜100%(n=18 样本小)；政策+高股息"
+    trigger_type: dip_buy
+    risk_line: null
+  - code: "601166"
+    name: 兴业银行
+    added: "2026-09-10"
+    thesis: "银行 PB0.40 低估(-2%)；ma20_cross +0.7%@20 胜59%(弱正)"
+    trigger_type: ma20_cross
+    risk_line: null
