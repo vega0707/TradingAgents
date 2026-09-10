@@ -1,0 +1,22 @@
+tradingagents/ashare/watchlist_check.py
+  s_e83a5402cf255a::t_69c1e2bf77a97b 39-40
+  s_e83a5402cf255a::t_1ced9e079a8c56 79-83,88
+config/watchlist.yaml
+  s_e83a5402cf255a::t_bdb856800c4c85 1-3,5-7,9,13,19,25,31,37,40-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "44de166e22220aebd4f0065d881dd5ee6bd67dea",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
