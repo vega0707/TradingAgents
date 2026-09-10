@@ -344,14 +344,27 @@ def render(port: dict, capital: float = 1_000_000) -> str:
             hi60 = s.get("hi60")
             at_high = bool(hi60 and s["mark"] and (hi60 - s["mark"]) / hi60 < 0.05)
             right_now = bool(s.get("prev") is not None and ma20 and s["mark"] >= ma20)
-            if at_high:
-                actions.append(f"- ⏸️ **{s['name']} {c}** 加仓信号：⚠️ 贴 60 日高({hi60:.2f})——高位暂缓追加，等回踩")
-            elif right_now:
-                actions.append(f"- 🟢 **{s['name']} {c}** 加仓：现有 {hands_text(sh)} ｜ ✅ 右侧建立"
-                               f"（站上 MA20 {ma20:.2f}）｜ {buy_lots_text(s['mark'], sh * s['mark'])}")
+            # 用户要求：给"到价提醒"具体价格（可抄进券商设监控）——agent 滞后，
+            # 价格触发才可执行。两类：回踩位(MA60×0.88) / 右侧位(站稳MA20)
+            dip_p = ma60 * 0.88 if ma60 else None
+            lots_txt = buy_lots_text(s["mark"], sh * s["mark"])
+            import re as _re
+            m = _re.search(r"可加 (\d+) 手.*首批 (\d+) 手", lots_txt)
+            lots, first = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+            if right_now:
+                cue2 = f"② 现价已站上右侧位({ma20:.2f})→可直接首批 {first} 手"
             else:
-                dip = f"回踩加仓位 ≈ MA60×0.88 = {ma60*0.88:.2f}" if ma60 else ""
-                actions.append(f"- ⏳ **{s['name']} {c}** 加仓信号：右侧未建立（需站上 MA20 {ma20:.2f} 连续确认）｜ {dip}")
+                cue2 = f"② ≥{ma20:.2f} 元站稳 加 {first} 手（右侧位）"
+            cue = (f"📌 到价提醒：① ≤{dip_p:.2f} 元 加 {first} 手（回踩位 dip）；{cue2}"
+                   if (dip_p and ma20 and lots) else f"（{lots_txt}）")
+            flag = "✅ 右侧已建立" if right_now else "⏳ 右侧未建立"
+            if at_high:
+                actions.append(f"- ⏸️ **{s['name']} {c}** 加仓信号：现价贴 60 日高({hi60:.2f})——"
+                               f"高位暂缓，等回踩 | {cue}")
+            else:
+                sym = "🟢" if right_now else "⏳"
+                actions.append(f"- {sym} **{s['name']} {c}** 加仓（{flag}，现价 {s['mark']:.2f}，"
+                               f"可加 {lots} 手/首批 {first} 手）| {cue}")
     if actions:
         lines += ["## 信号动作（交易员拍板）", *actions, ""]
     else:
