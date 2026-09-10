@@ -1,0 +1,20 @@
+tradingagents/ashare/valuation.py
+  s_e83a5402cf255a::t_f5b1cc52cc864b 95-123
+  s_e83a5402cf255a::t_31dc9d11ad175c 240-243,247-248
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "25be7015cdf387b03499c73e90ce79bc8edeb8b1",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
