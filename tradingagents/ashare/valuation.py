@@ -92,6 +92,35 @@ def pb_percentile(code: str, cur_pb: float, bvps: float, min_rows: int = 60) -> 
         return None
 
 
+def cashflow_quality(snap: FundamentalsSnapshot) -> tuple[str, float | None]:
+    """现金流质量：latest 期 每股现金流/EPS（<0.5 差）+ 是否季度持续为负。
+
+    教训(2026-09-10)：建筑 PB 0.21 被模型判'深度低估-75%'，但其季度每股
+    现金流连续为负、现金流/EPS 仅 38%——低质量净资产，市场折价合理（陷阱
+    非错杀）。估值必须叠加质量检查，否则把陷阱当机会。
+    返回 (标记, 比值)：标记 ∈ {'', '质差(疑似陷阱)', '现金流恶化'}。
+    """
+    try:
+        p = snap.periods
+        if not p:
+            return "", None
+        fcf = p[0].free_cash_flow_per_share
+        eps = p[0].earnings_per_share
+        ratio = (fcf / eps) if (fcf is not None and eps and eps > 0) else None
+        # 季度现金流连续为负（近 4 期非年报期的平均）
+        q = [x.free_cash_flow_per_share for x in p[:6]
+             if x.free_cash_flow_per_share is not None
+             and not x.report_period.endswith("12-31")]
+        neg_q = sum(1 for x in q if x < 0)
+        if ratio is not None and ratio < 0.5:
+            return "质差(疑似陷阱)", ratio
+        if q and neg_q == len(q):
+            return "现金流季度持续为负", ratio
+        return "", ratio
+    except Exception:
+        return "", None
+
+
 def annual_vol(code: str, as_of: str, n: int = 120) -> float:
     """近 n 日年化波动（r 的 σ 代理）。"""
     try:
@@ -208,9 +237,15 @@ def fair_value(code: str, as_of: str, name: str = "", snap=None,
         cur_pb = px / bvps
         # PB 历史分位（本地 SQLite 历史价 ÷ 当前 BVPS，近似）
         pct = pb_percentile(code, cur_pb, bvps)
+        # 现金流质量（防把低质量净资产的'便宜'当机会）
+        q_flag, q_ratio = ("", None)
+        if snap is not None:
+            q_flag, q_ratio = cashflow_quality(snap)
         delta = (px / fair_price - 1) * 100
         zone = "🔥高估" if delta > 30 else ("偏高" if delta > 10 else
                ("⚖️合理" if delta > -15 else ("低估" if delta > -30 else "🧊深度低估")))
+        if q_flag and delta < -30:
+            zone = f"⚠️低估但{q_flag}"   # 深度低估 + 质差 → 降级标注，不喊机会
         return {
             "code": code, "price": px, "roe": roe, "g": g,
             "bvps": bvps, "cur_pb": cur_pb, "fair_pb": fair_pb,
