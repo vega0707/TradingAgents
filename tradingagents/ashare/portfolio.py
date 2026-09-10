@@ -278,6 +278,13 @@ def render(port: dict, capital: float = 1_000_000) -> str:
     as_of = port["as_of"]
     stats = port["stats"]
     equity = sum(s["shares"] * (s["mark"] or 0) for s in stats.values() if s["mark"])
+    # 资金池假设（.env ASSUMED_CASH）：手数/仓位上限按"股票市值+可用资金"算
+    import os as _os
+    try:
+        cash = float(_os.environ.get("ASSUMED_CASH", "0") or 0)
+    except ValueError:
+        cash = 0.0
+    equity_total = equity + cash
     n_pos = sum(1 for s in stats.values() if s["shares"] > 0)
 
     risk = ("🟢 大盘多头（沪深300 > MA200）——可满仓"
@@ -318,8 +325,8 @@ def render(port: dict, capital: float = 1_000_000) -> str:
         ma20, ma60 = s.get("ma20"), s.get("ma60")
 
         def buy_lots_text(price: float, cur_mv: float) -> str:
-            """可买手数（单票上限 5% 组合市值）+ 建议首批（一半）。"""
-            cap = equity * 0.05
+            """可买手数（单票上限 5% 总资金[含资金池]）+ 建议首批（一半）。"""
+            cap = equity_total * 0.05
             room = cap - cur_mv
             if price <= 0 or room < price * 100:
                 return "已接近单票上限 5%，不建议再加"
