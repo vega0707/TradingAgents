@@ -296,11 +296,13 @@ def render(port: dict, capital: float = 1_000_000) -> str:
 
     # 2.5 估值锚：每只持仓 现价 vs 合理价（低估/高估），主源限流自动切新浪
     vlines = []
+    vmap: dict[str, dict] = {}
     for c, s in stats.items():
         if not s["shares"] or not s["mark"]:
             continue
         v = fair_value(c, port.get("as_of") or as_of, name=s["name"])
         if v:
+            vmap[c] = v
             src_mark = "·" if v["src"] == "sina" else ""
             vlines.append((v["delta_pct"],
                 f"- {s['name']} {c} {v['price']:.1f} vs 合理 {v['fair_price']:.0f}"
@@ -376,6 +378,29 @@ def render(port: dict, capital: float = 1_000_000) -> str:
         lines += ["## 信号动作（交易员拍板）", *actions, ""]
     else:
         lines += ["## 信号动作", "全部持有/观望——无强制动作", ""]
+
+    # 2.6 估值×信号交叉校验：两模块方向矛盾时不机械执行任一方
+    conflicts = []
+    for c, s in stats.items():
+        if not s["shares"] or not s["mark"]:
+            continue
+        v = vmap.get(c)
+        if not v:
+            continue
+        act = s.get("signal") or ""
+        low = v["delta_pct"] < -30     # 模型判深度低估
+        high = v["delta_pct"] > 30     # 模型判高估
+        if low and act in ("减仓", "清仓", "止损"):
+            conflicts.append(
+                f"- ⚠️ **{s['name']} {c}**：模型判**深度低估 {v['delta_pct']:+.0f}%**，"
+                f"但 LLM 判**{act}**——两者矛盾。先查 ROE 质量（现金流/应收/减值）"
+                f"确认是否价值陷阱：是陷阱则按信号减，是错杀则按估值拿，**勿机械执行**")
+        elif high and act in ("加仓", "建仓"):
+            conflicts.append(
+                f"- ⚠️ **{s['name']} {c}**：模型判**高估 {v['delta_pct']:+.0f}%**，"
+                f"但 LLM 判**{act}**——追高风险，确认新证据再动")
+    if conflicts:
+        lines += ["## 估值×信号冲突（需人工判断）", *conflicts, ""]
 
     # 2. 风险提示（非命令，提醒）
     warns = []
