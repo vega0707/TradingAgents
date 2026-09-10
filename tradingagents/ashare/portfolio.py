@@ -316,6 +316,17 @@ def render(port: dict, capital: float = 1_000_000) -> str:
         act = s.get("signal") or ""
         sh = int(s["shares"])
         ma20, ma60 = s.get("ma20"), s.get("ma60")
+
+        def buy_lots_text(price: float, cur_mv: float) -> str:
+            """可买手数（单票上限 5% 组合市值）+ 建议首批（一半）。"""
+            cap = equity * 0.05
+            room = cap - cur_mv
+            if price <= 0 or room < price * 100:
+                return "已接近单票上限 5%，不建议再加"
+            lots = int(room // (price * 100))
+            first = max(1, lots // 2)
+            return f"可加 {lots} 手（上限 5%≈{cap/10000:.1f}万），建议首批 {first} 手"
+
         if act == "清仓":
             actions.append(f"- 🔴 **{s['name']} {c}** 清仓：现有 {hands_text(sh)}，信号清仓")
         elif act == "止损":
@@ -326,6 +337,8 @@ def render(port: dict, capital: float = 1_000_000) -> str:
             else:
                 cut = (sh // 2) // 100 * 100
                 actions.append(f"- 🟡 **{s['name']} {c}** 减仓：现有 {hands_text(sh)}，建议先减 {cut//100} 手({cut} 股)观察")
+        elif act == "建仓":
+            actions.append(f"- 🟢 **{s['name']} {c}** 建仓：{buy_lots_text(s['mark'], 0)}")
         elif act == "加仓":
             # 价格闸：贴 60 日高（<5%）→ 高位不喊加（防逢高加仓）
             hi60 = s.get("hi60")
@@ -334,7 +347,8 @@ def render(port: dict, capital: float = 1_000_000) -> str:
             if at_high:
                 actions.append(f"- ⏸️ **{s['name']} {c}** 加仓信号：⚠️ 贴 60 日高({hi60:.2f})——高位暂缓追加，等回踩")
             elif right_now:
-                actions.append(f"- 🟢 **{s['name']} {c}** 加仓：现有 {hands_text(sh)} ｜ ✅ 右侧建立（站上 MA20 {ma20:.2f}）——可分批加")
+                actions.append(f"- 🟢 **{s['name']} {c}** 加仓：现有 {hands_text(sh)} ｜ ✅ 右侧建立"
+                               f"（站上 MA20 {ma20:.2f}）｜ {buy_lots_text(s['mark'], sh * s['mark'])}")
             else:
                 dip = f"回踩加仓位 ≈ MA60×0.88 = {ma60*0.88:.2f}" if ma60 else ""
                 actions.append(f"- ⏳ **{s['name']} {c}** 加仓信号：右侧未建立（需站上 MA20 {ma20:.2f} 连续确认）｜ {dip}")
