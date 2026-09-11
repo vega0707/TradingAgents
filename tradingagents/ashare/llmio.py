@@ -43,16 +43,28 @@ class LLMCallError(RuntimeError):
     pass
 
 
-def complete(tier: str, system: str, user: str, max_tokens: int = 2600) -> str:
-    """一次调用，返回文本；传输/网关失败抛 LLMCallError。"""
-    try:
-        resp = _client(tier).invoke([("system", system), ("human", user)])
-        # 兼容：标准 AIMessage 取 content；异常返回对象取纯文本
-        if hasattr(resp, "content") and isinstance(resp.content, str):
-            return resp.content
-        return str(resp)
-    except Exception as exc:
-        raise LLMCallError(f"LLM {tier} call failed: {exc}") from exc
+def complete(tier: str, system: str, user: str, max_tokens: int = 2600,
+             attempts: int = 3) -> str:
+    """一次调用（含网络/超时重试），返回文本；彻底失败抛 LLMCallError。
+
+    2026-09-11 教训：早盘任务因 'LLM quick call failed: Request timed out'
+    整体挂掉且静默——网关偶发超时必须退避重试，不能一次失败就放弃整批。
+    """
+    import time as _t
+    last: Exception | None = None
+    for i in range(attempts):
+        try:
+            resp = _client(tier).invoke([("system", system), ("human", user)])
+            # 兼容：标准 AIMessage 取 content；异常返回对象取纯文本
+            if hasattr(resp, "content") and isinstance(resp.content, str):
+                return resp.content
+            return str(resp)
+        except Exception as exc:  # noqa: BLE001 — 超时/连接/限流均可重试
+            last = exc
+            logger.warning("LLM %s call failed (attempt %d/%d): %s", tier, i + 1, attempts, exc)
+            if i < attempts - 1:
+                _t.sleep(3 * (i + 1))
+    raise LLMCallError(f"LLM {tier} call failed after {attempts} attempts: {last}")
 
 
 def complete_json(tier: str, system: str, user: str, max_tokens: int = 2600) -> dict:
