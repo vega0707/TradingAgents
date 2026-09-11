@@ -225,3 +225,6 @@ reports/
 # ashare 运行产物（决策记录/对账/云端缓存数据）
 ashare_out/
 data/
+
+# 运行日志（每日任务输出，不入库）
+logs/
