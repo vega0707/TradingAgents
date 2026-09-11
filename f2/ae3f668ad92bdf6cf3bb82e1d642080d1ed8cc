@@ -1,0 +1,20 @@
+scripts/scan_dip.py
+  s_e83a5402cf255a::t_79d2d4cce415e2 1,7-12,22-24,27-28,62-65,71-73,78,81-82,89,91,93,95-96,98,100-101,105,107,120,123,128-135
+  s_e83a5402cf255a::t_8f4efad60f12b6 2-6,13-21,25-26,29-61,66-70,74-77,79-80,83-88,90,92,94,97,99,102-104,106,108-119,121-122,124-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "f2ae3f668ad92bdf6cf3bb82e1d642080d1ed8cc",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
