@@ -1,0 +1,19 @@
+tradingagents/ashare/daily_brief.py
+  s_e83a5402cf255a::t_965745aec178a5 220-223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "03663469542198bea680a9e5ec7a38a7e0f183a1",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
