@@ -246,7 +246,9 @@ def deep_one(code: str, name: str, as_of: str) -> str:
     import subprocess
     import sys as _sys
 
-    print(f"[深析] {name} {code} ({as_of}) …", flush=True)
+    # 进度日志一律走 stderr：stdout 是卡片正文（重定向进 /tmp/ashare-morning.md）
+    sys.stderr.write(f"[深析] {name} {code} ({as_of}) …\n")
+    sys.stderr.flush()
     r = subprocess.run(
         [_sys.executable, "-m", "tradingagents.ashare.run",
          "--ticker", code, "--name", name, "--date", as_of,
@@ -282,7 +284,7 @@ def deep_dive(cands: list[dict], as_of: str) -> tuple[list[str], int, int]:
     for c in cands:
         done = _already_deep(c["code"], as_of)
         if done:
-            print(f"[跳过] {c['name']} {c['code']} 近 3 天({done})已深析", flush=True)
+            sys.stderr.write(f"[跳过] {c['name']} {c['code']} 近 3 天({done})已深析\n")
         else:
             todo.append(c)
     if not todo:
@@ -296,12 +298,12 @@ def deep_dive(cands: list[dict], as_of: str) -> tuple[list[str], int, int]:
             m = build_material(c["code"], as_of, c["name"])
             if m.fundamentals_ok:
                 warmed.append(c)
-                print(f"[预热] {c['name']} 财务 OK", flush=True)
+                sys.stderr.write(f"[预热] {c['name']} 财务 OK\n")
             else:
-                print(f"[预热] {c['name']} 基本面缺失仍尝试深析", flush=True)
+                sys.stderr.write(f"[预热] {c['name']} 基本面缺失仍尝试深析\n")
                 warmed.append(c)
         except Exception as e:  # noqa: BLE001
-            print(f"[预热] {c['name']} 失败({str(e)[:80]})，仍深析", flush=True)
+            sys.stderr.write(f"[预热] {c['name']} 失败({str(e)[:80]})，仍深析\n")
             warmed.append(c)
 
     results = []
