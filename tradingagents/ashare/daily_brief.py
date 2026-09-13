@@ -217,6 +217,10 @@ def advice_card(c: dict, rec_line: str, as_of: str) -> list[str]:
         else:
             out.append(f"  💰 单票上限 {cap/10000:.1f}万 → 最多 {lots} 手（1手={hand_cost/10000:.1f}万）")
     if gates:
+        # 裁决唯一：风格闸命中时同一张卡里不能既喊"可入"又说冲突
+        # （用户 2026-09-10 / 09-14 两次指出"前面说可入后面说别追，到底听哪个"）
+        if "🟢 可入" in out[0]:
+            out[0] = out[0].replace("🟢 可入", "⚠️ **不建议**（不满足低回撤）")
         out.append(f"  ⚠️ 风格闸命中：{'、'.join(gates)}——与你的低回撤原则冲突，仅建议小仓试探或回避")
     rec_p = Path("ashare_out") / f"{c['code']}-{as_of}" / "record.json"
     if rec_p.exists():
