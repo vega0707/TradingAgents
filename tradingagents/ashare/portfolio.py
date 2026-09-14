@@ -28,6 +28,17 @@ from tradingagents.ashare.valuation import fair_value
 
 DEFAULT_TICKERS = "/Users/vega/git/ai-hedge-fund/config/tickers.yaml"
 SIGNAL_TO_FACTOR = {"清仓": 0.0, "止损": 0.0, "减仓": 0.6, "持有": 1.0, "观望": 1.0, "加仓": 1.0}
+
+# 交易员（LLM）用词与本地动作枚举不完全一致：实测出现"减持""增持"，
+# 不归一会让信号被静默丢弃（2026-09-14 电连技术"减持"未进决策单，
+# 被当成"持有"处理）。所有读取 action 的地方都必须过 norm_action。
+ACTION_ALIASES = {"减持": "减仓", "增持": "加仓", "买入": "建仓", "卖出": "清仓"}
+
+
+def norm_action(action: str | None) -> str:
+    """把交易员动作词归一化到本地枚举（幂等）。"""
+    a = (action or "").strip()
+    return ACTION_ALIASES.get(a, a)
 SINGLE_CAP = 0.15          # 单票上限
 CASH_RATIO_OFF = 0.5       # 大盘破 MA200 时的总仓位系数
 RISK_FREE = 0.02           # 无风险利率(估算，仅夏普展示)
@@ -62,7 +73,7 @@ def latest_signal(records_dir: Path, code: str) -> dict | None:
         return None
     rec = best["rec"]
     return {
-        "action": (rec.get("trader") or {}).get("action", ""),
+        "action": norm_action((rec.get("trader") or {}).get("action", "")),
         "mark": rec.get("mark"),
         "name": rec.get("name") or code,
         "fundamentals_ok": rec.get("fundamentals_ok"),
@@ -85,7 +96,7 @@ def load_signals(records_dir: Path, as_of: str, fallback: bool = True) -> dict[s
             continue
         rec = json.loads(rp.read_text(encoding="utf-8"))
         out[code] = {
-            "action": (rec.get("trader") or {}).get("action", ""),
+            "action": norm_action((rec.get("trader") or {}).get("action", "")),
             "mark": rec.get("mark"),
             "name": rec.get("name") or code,
             "fundamentals_ok": rec.get("fundamentals_ok"),
@@ -220,8 +231,8 @@ def build_portfolio(holdings, signals, as_of: str) -> dict:
         }
         if code in signals:
             sig = signals[code]
-            stats[code]["signal"] = sig["action"] or "无信号"
-            stats[code]["factor"] = SIGNAL_TO_FACTOR.get(sig["action"], 1.0)
+            stats[code]["signal"] = norm_action(sig["action"]) or "无信号"
+            stats[code]["factor"] = SIGNAL_TO_FACTOR.get(norm_action(sig["action"]), 1.0)
             stats[code]["fundamentals_ok"] = sig["fundamentals_ok"]
 
     # 2. 入池：持仓票(shares>0)保留；已清仓票(shares=0)仅当信号为建仓/加仓才回场
