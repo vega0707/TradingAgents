@@ -224,7 +224,10 @@ reports/
 
 # ashare 运行产物（决策记录/对账/云端缓存数据）
 ashare_out/
-data/
+/data/
+# 注意：只忽略根级 data/（market.db 等运行数据）。
+# 原规则写 `data/` 会连带匹配 tradingagents/ashare/data/（源码目录），
+# 导致改那个目录的文件时 git add 被拒（2026-09-14 踩到）。
 
 # 运行日志（每日任务输出，不入库）
 logs/

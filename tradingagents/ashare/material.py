@@ -189,6 +189,28 @@ class Material:
         return body
 
 
+def _sina_fundamentals_fallback(ticker: str) -> str | None:
+    """东财/akshare 断连时的财务兜底：新浪财务页单据 ROE/每股净资产。
+
+    2026-09-14：东财接口间歇断连（成片出现，与调用频率无关），早盘任务出现
+    “基本面缺失仍深析”。兜底只给两个关键量并明标口径，绝不假装数据完整。
+    """
+    try:
+        # 延迟导入：valuation 模块级 import 本模块，避免循环导入
+        from tradingagents.ashare.valuation import sina_metrics
+        sm = sina_metrics(ticker)
+    except Exception:  # noqa: BLE001 — 兜底再失败就退回“不可用”
+        return None
+    if not sm:
+        return None
+    return (
+        f"【新浪财务页兜底·单期口径】净资产收益率 {sm['roe'] * 100:.2f}%、"
+        f"每股净资产 {sm['bvps']:.2f} 元。\n"
+        "注意：东财主源本次不可用，以上仅单期简化数据——历史趋势、现金流、"
+        "负债与毛利率等维度全部缺失，请按'信息不完整'处理，勿据此给高置信结论。"
+    )
+
+
 def build_material(ticker: str, as_of: str, name: str = "") -> Material:
     """ticker 形如 601318；name 可传中文名（没有则用 'T'+code 占位）。"""
     etf = is_etf(ticker)
@@ -197,6 +219,7 @@ def build_material(ticker: str, as_of: str, name: str = "") -> Material:
     price_text, meta = render_price_section(ticker, as_of)
 
     fundamentals, ok = "", False
+    cacheable = False
     if not etf:
         # 当日缓存：同一 ticker 同一天重复 build（重跑/对账）不再全量拉 akshare
         # 快照缓存按 ticker（跨 as_of 共享——render 故意 date-free，同一报告期
@@ -214,12 +237,19 @@ def build_material(ticker: str, as_of: str, name: str = "") -> Material:
             snap = bs(ticker, as_of, AkshareDataClient())
             fundamentals = snap.render()
             ok = True
+            cacheable = True
         except Exception as exc:  # InsufficientData / 网络 / 源拒绝
-            fundamentals = (
-                f"基本面快照不可用（{type(exc).__name__}: {str(exc)[:200]}）。"
-                "若凭现有信息无法按你的方法判断，请输出 abstain。"
-            )
-        if ok:  # 只缓存成功快照；失败可重试，不被坏缓存挡住
+            fallback = _sina_fundamentals_fallback(ticker)
+            if fallback:
+                fundamentals = fallback
+                ok = True          # 有数据可看（但已标注口径不完整）
+                # cacheable 保持 False：兜底不写缓存，主源恢复后下次重取完整快照
+            else:
+                fundamentals = (
+                    f"基本面快照不可用（{type(exc).__name__}: {str(exc)[:200]}）。"
+                    "若凭现有信息无法按你的方法判断，请输出 abstain。"
+                )
+        if cacheable:  # 只缓存完整快照；兜底/失败都可重试，不被坏数据挡住
             _cache_save("snapshot", ticker,
                         {"ok": True, "fundamentals": fundamentals},
                         ttl_days=SNAPSHOT_TTL_DAYS)

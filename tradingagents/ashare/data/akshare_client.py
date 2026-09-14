@@ -908,6 +908,10 @@ class AkshareDataClient:
         — infrastructure failures stay loud, they never become empty data.
         """
         last: Exception | None = None
+        # 断连是"成片"出现的：2026-09-14 实测同一接口 20 次全失败、几分钟后
+        # 又 100% 成功（与频率无关，疑为共享出口 IP 被间歇限流）。旧的
+        # 2/4/8/16s 快速重试全落在同一个坏窗口里 → 必然全败；改成跨窗口退避。
+        backoff = (3.0, 10.0, 25.0, 60.0)
         for attempt in range(retries):
             try:
                 return fn(*args, **kwargs)
@@ -918,7 +922,7 @@ class AkshareDataClient:
                     attempt + 1, retries, exc,
                 )
                 if attempt < retries - 1:
-                    time.sleep(delay * (2 ** attempt))  # 2/4/8/16s 指数退避
+                    time.sleep(max(delay, backoff[min(attempt, len(backoff) - 1)]))
         assert last is not None
         raise last
 
