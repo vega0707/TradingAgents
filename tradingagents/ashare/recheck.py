@@ -92,6 +92,7 @@ def main() -> None:
         tag = "🔴 疑似噪音(基本面未变就反转)" if r["warn"] else "（间隔较长，可视为新判断）"
         print(f"- {r['name']} {r['code']}: {r['prev']} → {r['cur']} ({r['days']}天) {tag}")
     print("\n建议：🔴 项先不执行/小仓验证；等价格与基本面共振再动。")
+    print("（若上方『信号动作』里出现同一标的，以本段为准——暂缓执行该动作）")
 
 
 if __name__ == "__main__":
