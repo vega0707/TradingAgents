@@ -1,0 +1,19 @@
+tradingagents/ashare/recheck.py
+  s_e83a5402cf255a::t_425ef7bac3153d 95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "ead2646dbb077ce83eb20206c4803cd5b26b6a86",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
