@@ -1,0 +1,21 @@
+scripts/screen_quality.py
+  s_e83a5402cf255a::t_4a06aaa70188a6 75-80,82,88-95,103,105-107,110-111
+  s_e83a5402cf255a::t_c710215d9cd74e 1-32,34-74,81,83-87,96-102,104,108-109,112-175
+  s_e83a5402cf255a::t_a363236684c872 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "aa753947c32f1690f3dcb34f3e3519ed7d86b26e",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
