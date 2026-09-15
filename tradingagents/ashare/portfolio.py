@@ -318,12 +318,34 @@ def render(port: dict, capital: float = 1_000_000) -> str:
             vlines.append((v["delta_pct"],
                 f"- {s['name']} {c} {v['price']:.1f} vs 合理 {v['fair_price']:.0f}"
                 f" {v['delta_pct']:+.0f}% {v['zone']}{src_mark}"))
+    # 取失败的票隔一会儿整体重试一次：数据源是成片断连（分钟级窗口），
+    # 12:01 全失败 / 12:10 全通过的情况实测过（2026-09-15）
+    missed = [c for c, s in stats.items()
+              if s["shares"] and s["mark"] and c not in vmap]
+    if missed:
+        import time as _t
+        _t.sleep(8)
+        for c in missed:
+            v = fair_value(c, as_of, name=stats[c]["name"])
+            if not v:
+                continue
+            vmap[c] = v
+            src_mark = "·" if v["src"] == "sina" else ""
+            vlines.append((v["delta_pct"],
+                f"- {stats[c]['name']} {c} {v['price']:.1f} vs 合理 {v['fair_price']:.0f}"
+                f" {v['delta_pct']:+.0f}% {v['zone']}{src_mark}"))
     if vlines:
         lines += ["## 估值锚（现价 vs 合理价，ROE-PB 模型）"]
         for _, l in sorted(vlines):
             lines.append(l)
         lines.append("· = 新浪源(akshare 限流时)")
         lines.append("")
+    else:
+        # 数据源成片断连时估值会全空（2026-09-15 实测：12:01 全失败、12:10 全通过）。
+        # 静默留空会让用户以为"没有估值"，必须说明是取数失败。
+        lines += ["## 估值锚（现价 vs 合理价，ROE-PB 模型）",
+                  "（本次没取到任何持仓的财务数据——数据源断连，估值锚缺失。"
+                  "稍后重跑 `bash run_local_ashare.sh` 通常会补上）", ""]
 
     # 1. 信号动作（LLM 交易员拍板；A股整手=100股，股数按整手给）
     def hands_text(sh: int) -> str:
