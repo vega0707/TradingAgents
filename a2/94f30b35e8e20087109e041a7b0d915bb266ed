@@ -1,0 +1,20 @@
+scripts/screen_forecast.py
+  s_e83a5402cf255a::t_6633710998b052 1-125,133-145
+  s_e83a5402cf255a::t_f24d790af15244 126-132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "a294f30b35e8e20087109e041a7b0d915bb266ed",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
