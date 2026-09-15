@@ -1,0 +1,22 @@
+scripts/screen_fundamental.py
+  s_e83a5402cf255a::t_85759d56d3c675 27-30,44-56,61-65,67-81
+  s_e83a5402cf255a::t_06e441a94b70f5 1-26,34-35,39,42-43,57-60,66,82-96,101-116,118-119,121-128,133,135-140,142,144-145,148-155
+  s_e83a5402cf255a::t_bfb7e287f1fb7d 31-33
+  s_e83a5402cf255a::t_95f0aa00fd29ca 36-38,40-41,97-100,117,120,129-132,134,141,143,146-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "7d896c79cd1e985db4802b6b3a59e0f17e53af0e",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
