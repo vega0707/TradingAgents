@@ -1,0 +1,20 @@
+scripts/screen_edge.py
+  s_e83a5402cf255a::t_23767c542d467e 8-10,14-17,19-20,27,37-40,45-50,53-55,57-63,74-75,97,112-114,118-121,123-125,129,131-134,138-144,152,154-159,169-170
+  s_e83a5402cf255a::t_619d0e005dbcbc 1-7,11-13,18,21-26,28-36,41-44,51-52,56,64-73,76-96,98-111,115-117,122,126-128,130,135-137,145-151,153,160-168,171-174
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "20731e86a6a41e3892989c08ad78f0dbcaeafbc7",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
