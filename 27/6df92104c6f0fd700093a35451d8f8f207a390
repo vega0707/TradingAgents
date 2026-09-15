@@ -1,0 +1,20 @@
+scripts/screen_trend.py
+  s_e83a5402cf255a::t_27f56f2644e22b 65-68,81-84,100,115,175,190
+  s_e83a5402cf255a::t_a486cde8953f61 1-64,69-80,85-99,101-114,116-174,176-189,191-210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "276df92104c6f0fd700093a35451d8f8f207a390",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
