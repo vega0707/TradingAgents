@@ -311,7 +311,10 @@ def render(port: dict, capital: float = 1_000_000) -> str:
     for c, s in stats.items():
         if not s["shares"] or not s["mark"]:
             continue
-        v = fair_value(c, port.get("as_of") or as_of, name=s["name"])
+        # allow_fetch=True：冷拉东财快照（20 期完整指标）。旧版不敢开启是因为
+        # akshare 冷拉慢/易断；换 EastMoneyClient 后 1 请求/票、秒级返回，
+        # 13 只持仓约 10s——估值锚是卡片核心信息，值得用高质量数据。
+        v = fair_value(c, port.get("as_of") or as_of, name=s["name"], allow_fetch=True)
         if v:
             vmap[c] = v
             src_mark = "·" if v["src"] == "sina" else ""
@@ -326,7 +329,7 @@ def render(port: dict, capital: float = 1_000_000) -> str:
         import time as _t
         _t.sleep(8)
         for c in missed:
-            v = fair_value(c, as_of, name=stats[c]["name"])
+            v = fair_value(c, as_of, name=stats[c]["name"], allow_fetch=True)
             if not v:
                 continue
             vmap[c] = v
@@ -338,7 +341,7 @@ def render(port: dict, capital: float = 1_000_000) -> str:
         lines += ["## 估值锚（现价 vs 合理价，ROE-PB 模型）"]
         for _, l in sorted(vlines):
             lines.append(l)
-        lines.append("· = 新浪源(akshare 限流时)")
+        lines.append("· = 新浪兜底源（东财快照未覆盖时）")
         lines.append("")
     else:
         # 数据源成片断连时估值会全空（2026-09-15 实测：12:01 全失败、12:10 全通过）。
