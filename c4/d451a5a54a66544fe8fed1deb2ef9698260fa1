@@ -1,0 +1,35 @@
+tradingagents/ashare/data/eastmoney_client.py
+  s_e83a5402cf255a::t_6459dc2e66c574 1-7,9-16,19,21-69,71-76,79,81,83-90,92,95,97,99-100,102-106,108-119,123-133,136,138-141,143-144,146-147,149-150,152-153,155-172
+tradingagents/ashare/daily_brief.py
+  s_e83a5402cf255a::t_68a6280459298d 55,57,59
+  s_e83a5402cf255a::t_0dc7cff3e7d3fa 76-78,85,89-119
+pyproject.toml
+  s_e83a5402cf255a::t_14194440be86fa 13
+tradingagents/ashare/valuation.py
+  s_e83a5402cf255a::t_2b321500e168f7 26
+  s_e83a5402cf255a::t_e30d3edb9d0a13 175
+scripts/screen_forecast.py
+  s_e83a5402cf255a::t_9a17ae999bfa76 55-78
+tradingagents/ashare/data/__init__.py
+  s_e83a5402cf255a::t_eb1c54f81c89b6 3-4,7,11
+tradingagents/ashare/material.py
+  s_e83a5402cf255a::t_181401d79243c0 235,237
+scripts/bt_zt_nextday.py
+  s_e83a5402cf255a::t_7ce155739b9e86 7-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "c4d451a5a54a66544fe8fed1deb2ef9698260fa1",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
