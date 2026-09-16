@@ -52,10 +52,11 @@ def fetch_feed(pages: int = 4) -> list[str]:
 
 
 def code_table() -> dict[str, str]:
-    """全市场 {公司名: 代码}。缓存放宽 7 天 + akshare 失败用旧缓存兜底。
+    """全市场 {公司名: 代码}。缓存放宽 7 天 + 取数失败用旧缓存兜底。
 
-    教训(2026-09-10)：当日缓存隔天必重拉，akshare 连不上时 5 次退避重试
+    教训(2026-09-10)：当日缓存隔天必重拉，数据源连不上时 5 次退避重试
     卡死早盘任务——A 股代码表月度级变化，7 天缓存足够；失败读旧缓存。
+    2026-09-16：数据源由 akshare 换为东财 clist 直连（见 _em_code_table）。
     """
     cache = None
     if CODE_CACHE.is_file():
@@ -72,17 +73,50 @@ def code_table() -> dict[str, str]:
         except Exception:
             pass
     try:
-        import akshare as ak
-        df = ak.stock_info_a_code_name()
-        data = {str(r["name"]).strip(): str(r["code"]) for _, r in df.iterrows()}
+        data = _em_code_table()
+        if not data:
+            raise RuntimeError("东财代码表为空")
         CODE_CACHE.parent.mkdir(parents=True, exist_ok=True)
         CODE_CACHE.write_text(json.dumps({"day": time.strftime("%Y-%m-%d"), "data": data},
                                          ensure_ascii=False), encoding="utf-8")
         return data
     except Exception:
         if cache and cache.get("data"):
-            return cache["data"]   # akshare 挂 → 旧代码表兜底（代码表月级稳定）
+            return cache["data"]   # 取数失败 → 旧代码表兜底（代码表月级稳定）
         raise
+
+
+def _em_code_table() -> dict[str, str]:
+    """全市场 {名称: 代码}：东财 clist 分页直连（替代 akshare.stock_info_a_code_name）。
+
+    一次 100 只、约 56 页，只取 f12(代码)/f14(名称) 两字段。多子域轮询——
+    实测 push2 断连时 82.push2 / push2delay 仍通。7 天缓存（见 code_table）。
+    """
+    hosts = ("82.push2.eastmoney.com", "push2delay.eastmoney.com", "push2.eastmoney.com")
+    fs = "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23"
+    out: dict[str, str] = {}
+    for pn in range(1, 70):
+        rows = []
+        for host in hosts:
+            try:
+                url = (f"https://{host}/api/qt/clist/get?pn={pn}&pz=100&po=1&np=1&fltt=2&invt=2"
+                       f"&fid=f12&fs={fs}&fields=f12,f14")
+                req = urllib.request.Request(url, headers={"User-Agent": _UA})
+                d = json.loads(urllib.request.urlopen(req, timeout=15).read().decode())
+                rows = ((d.get("data") or {}).get("diff") or [])
+                if rows:
+                    break
+            except Exception:  # noqa: BLE001 — 换下一个行情节点
+                continue
+        if not rows:
+            break
+        for r in rows:
+            if r.get("f12") and r.get("f14"):
+                out[str(r["f14"]).strip()] = str(r["f12"])
+        if len(rows) < 100:
+            break
+        time.sleep(0.15)
+    return out
 
 
 def resolve_names(names: list[str], table: dict[str, str]) -> list[tuple[str, str]]:

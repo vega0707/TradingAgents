@@ -23,7 +23,7 @@ from datetime import date
 from pathlib import Path
 from typing import Optional
 
-from tradingagents.ashare.data import AkshareDataClient
+from tradingagents.ashare.data import EastMoneyClient
 from tradingagents.ashare.material import fetch_daily_kline
 from tradingagents.ashare.snapshot import FundamentalsSnapshot, build_snapshot
 
@@ -172,7 +172,7 @@ def _get_snapshot(code: str, as_of: str, allow_fetch: bool = True) -> Optional[F
             return FundamentalsSnapshot.model_validate(entry["snap"])
     if not allow_fetch:
         return None  # 缓存 miss 且不许冷拉 → 调用方走新浪快路径
-    snap = build_snapshot(code, as_of, AkshareDataClient())
+    snap = build_snapshot(code, as_of, EastMoneyClient())
     cache[key] = {"day": date.today().isoformat(), "as_of": as_of,
                   "snap": snap.model_dump(mode="json")}
     try:

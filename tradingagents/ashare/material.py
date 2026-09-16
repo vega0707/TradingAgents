@@ -232,9 +232,9 @@ def build_material(ticker: str, as_of: str, name: str = "") -> Material:
                 mark=meta["mark"], fundamentals_ok=bool(cached["ok"]),
             )
         try:
-            from tradingagents.ashare.data import AkshareDataClient
+            from tradingagents.ashare.data import EastMoneyClient
             from tradingagents.ashare.snapshot import build_snapshot as bs
-            snap = bs(ticker, as_of, AkshareDataClient())
+            snap = bs(ticker, as_of, EastMoneyClient())
             fundamentals = snap.render()
             ok = True
             cacheable = True

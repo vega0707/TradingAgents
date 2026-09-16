@@ -52,14 +52,30 @@ def spot_prices(codes: list[str]) -> dict[str, float]:
 
 
 def forecast(code: str) -> list[dict]:
-    """该票的未来年度盈测（同花顺）。"""
-    import akshare as ak
-    df = ak.stock_profit_forecast_ths(symbol=code)
-    rows = []
-    for _, r in df.iterrows():
-        rows.append({"year": str(r.get("年度")), "orgs": r.get("预测机构数"),
-                     "mean": r.get("均值")})
-    return rows
+    """该票的未来年度盈测（东财研报预测，1 次请求）。
+
+    2026-09-16 替换 akshare 的同花顺接口：东财 RPT_WEB_RESPREDICT 直接给
+    YEAR1/2/3 与对应 EPS 预测 + 评级机构数，同域名（datacenter-web）稳定。
+    YEAR_MARK：A=已实现（实际值），E=预测。
+    """
+    import json as _json
+    import urllib.request as _ur
+    u = ("https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_WEB_RESPREDICT"
+         f"&columns=ALL&filter=(SECURITY_CODE%3D%22{code}%22)&pageSize=1")
+    req = _ur.Request(u, headers={"User-Agent": "Mozilla/5.0",
+                                  "Referer": "https://data.eastmoney.com/"})
+    d = _json.loads(_ur.urlopen(req, timeout=20).read().decode())
+    rows = (d.get("result") or {}).get("data") or []
+    if not rows:
+        return []
+    r = rows[0]
+    out = []
+    for i in (1, 2, 3):
+        y, eps, mark = r.get(f"YEAR{i}"), r.get(f"EPS{i}"), r.get(f"YEAR_MARK{i}")
+        if y and isinstance(eps, (int, float)):
+            out.append({"year": str(y), "orgs": r.get("RATING_ORG_NUM"),
+                        "mean": eps, "mark": mark})
+    return out
 
 
 def parse_quality(path: Path) -> list[tuple[str, str, str]]:
