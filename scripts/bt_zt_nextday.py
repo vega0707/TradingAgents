@@ -14,6 +14,7 @@ akshare（东财涨停池接口没做直连），运行前需 `pip install aksha
 """
 import argparse
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -22,11 +23,19 @@ from pathlib import Path
 OUT = Path("ashare_out") / "_bt"
 _UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0"
 
+# 涨停池/交易日历用 akshare（东财无直连实现）。公司网络直连东财节点长期不通，
+# 腾讯云出口实测秒级成功 → 建 SOCKS5 隧道走腾讯云（见 ashare/proxy.py）。
+from tradingagents.ashare.proxy import ensure_tx_tunnel, tx_proxy  # noqa: E402
+
+if not ensure_tx_tunnel():
+    print("[warn] 腾讯云隧道不可用——akshare 取数可能失败（先查 ssh 免密/网络）")
+
 
 def trade_days_before(end: str, n: int) -> list[str]:
     """end(YYYY-MM-DD 或 YYYYMMDD) 往前 n 个交易日（含 end）→ ['YYYYMMDD'...] 升序。"""
-    import akshare as ak
-    cal = ak.tool_trade_date_hist_sina()
+    with tx_proxy():   # 仅 akshare 走腾讯云隧道（urllib 直连请求不受影响）
+        import akshare as ak
+        cal = ak.tool_trade_date_hist_sina()
     days = sorted(str(d)[:10].replace("-", "") for d in cal["trade_date"])
     end_fmt = end.replace("-", "")
     if end_fmt not in days:
@@ -37,8 +46,9 @@ def trade_days_before(end: str, n: int) -> list[str]:
 
 def zt_pool(day: str) -> list[dict]:
     """一天涨停池 → [{code,name,zt_price,lb(连板),ind}]。"""
-    import akshare as ak
-    df = ak.stock_zt_pool_em(date=day)
+    with tx_proxy():
+        import akshare as ak
+        df = ak.stock_zt_pool_em(date=day)
     if df is None or df.empty:
         return []
     return [{
