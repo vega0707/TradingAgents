@@ -1,0 +1,20 @@
+tradingagents/ashare/market_review.py
+  s_e83a5402cf255a::t_a24a0244fded21 1-144,147-148,151,154-196
+  s_e83a5402cf255a::t_4b2ac2e953c80d 145-146,149-150,152-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "3a1ba4ea4d7863fc2aba2fc2a1ce5ef1ada8aefe",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto(free)"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
