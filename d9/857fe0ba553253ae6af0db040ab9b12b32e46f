@@ -1,0 +1,23 @@
+scripts/bt_policy.py
+  s_e83a5402cf255a::t_05bc8cc7ad9b43 1-40,42,44-49,81-83,87,92-224
+  s_e83a5402cf255a::t_8238a0e9ed142c 41,43,50-80
+  s_e83a5402cf255a::t_f8fbc2399069ef 84-86,88-91
+scripts/bt_regime.py
+  s_e83a5402cf255a::t_c5aae092290f39 1-191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "d9857fe0ba553253ae6af0db040ab9b12b32e46f",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
