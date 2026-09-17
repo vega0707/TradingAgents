@@ -1,0 +1,23 @@
+tradingagents/ashare/macro.py
+  s_e83a5402cf255a::t_68906cfbfaa3cf 35
+  s_e83a5402cf255a::t_a0455101082b4e 33-34,104-237,295,297-298
+  s_e83a5402cf255a::t_ec16be9a4a9414 238-239
+  s_e83a5402cf255a::t_f5ce85211c480c 410-411,431-432,434,439-440
+  s_e83a5402cf255a::t_124d8d90928713 433,435-438
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "3df5896542e85967fa966d62c286280527e242c5",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
