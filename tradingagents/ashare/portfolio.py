@@ -311,8 +311,13 @@ def render(port: dict, capital: float = 1_000_000) -> str:
     try:
         from tradingagents.ashare.macro import collect as _mac_collect, judge as _mac_judge
         _mj = _mac_judge(_mac_collect())
+        _rg = _mj.get("regime") or {}
         lines += [f"**宏观大势：{_mj['stance']}（{_mj['total']:+d}）→ {_mj['position']}**",
-                  "　" + " ｜ ".join(f"{n} {s:+d}" for n, s, _ in _mj["layers"]), ""]
+                  "　" + " ｜ ".join(f"{n} {s:+d}" for n, s, _ in _mj["layers"]),
+                  f"　**Regime（趋势口径）：{_rg.get('regime')}**"
+                  + (f"——{_rg.get('hist')}" if _rg.get("hist") else ""),
+                  f"　政策窗口（水平口径）：{_rg.get('window')}",
+                  f"　→ {_rg.get('advice')}", ""]
     except Exception:
         lines += ["宏观大势：本次未取到数据", ""]
 
