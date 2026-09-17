@@ -1,0 +1,20 @@
+scripts/bt_macro.py
+  s_e83a5402cf255a::t_c418ee5a0478ab 1-141,143-156
+  s_e83a5402cf255a::t_c4158640bcb0da 142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "bb362f5362c0dd437a73b632e15507b47914645e",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
