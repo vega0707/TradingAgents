@@ -305,6 +305,17 @@ def render(port: dict, capital: float = 1_000_000) -> str:
     lines = [f"# 持仓状态与建议 · {as_of}", "",
              f"{risk} ｜ 持仓 {n_pos} 只 ｜ 股票市值 {equity/10000:.1f}万", ""]
 
+    # 宏观大势（三层：全球流动性 / 国内基本面 / 市场结构）。2026-09-17 加入——
+    # 此前卡片只有一个"沪深300 vs MA200"开关，美联储三年来首次加息这种级别的事
+    # 在卡片上完全不可见。走 macro 当日缓存：命中秒回，未命中拉一次（每天一次）。
+    try:
+        from tradingagents.ashare.macro import collect as _mac_collect, judge as _mac_judge
+        _mj = _mac_judge(_mac_collect())
+        lines += [f"**宏观大势：{_mj['stance']}（{_mj['total']:+d}）→ {_mj['position']}**",
+                  "　" + " ｜ ".join(f"{n} {s:+d}" for n, s, _ in _mj["layers"]), ""]
+    except Exception:
+        lines += ["宏观大势：本次未取到数据", ""]
+
     # 2.5 估值锚：每只持仓 现价 vs 合理价（低估/高估），主源限流自动切新浪
     vlines = []
     vmap: dict[str, dict] = {}
