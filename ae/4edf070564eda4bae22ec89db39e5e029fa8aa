@@ -1,0 +1,22 @@
+tradingagents/ashare/macro.py
+  s_e83a5402cf255a::t_631da25c489d97 1-129,131-133,137,139-218,220,227-282,285-302
+  s_e83a5402cf255a::t_5d995aa5b8263a 130,134-136,138,219,221-226,283-284
+tradingagents/ashare/portfolio.py
+  s_e83a5402cf255a::t_8b1d090e28cbff 308-318
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "ae4edf070564eda4bae22ec89db39e5e029fa8aa",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
