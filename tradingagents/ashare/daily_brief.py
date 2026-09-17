@@ -29,7 +29,12 @@ KEEP = ["政策", "证监会", "央行", "国常会", "发改委", "工信部", 
         "新能源", "光伏", "储能", "算力", "人工智能", "机器人", "创新药", "医药",
         "白酒", "消费", "地产", "银行", "券商", "黄金", "有色", "化工", "涨价",
         "中标", "订单", "回购", "增持", "减持", "业绩", "财报", "北向", "IPO",
-        "并购", "重组", "发布", "印发", "通知", "意见", "方案", "国产", "出海"]
+        "并购", "重组", "发布", "印发", "通知", "意见", "方案", "国产", "出海",
+        # 海外宏观（2026-09-17 补）：词表原来只有国内政策与行业，导致美联储加息
+        # 当天 11 条相关快讯被丢弃 3 条（含"摩根士丹利：加息加剧亚洲股市回调风险"），
+        # 早盘简报完全没提这事儿。
+        "美联储", "联储", "加息", "降息", "美债", "美元", "汇率", "美股",
+        "纳指", "道指", "标普", "非农", "CPI", "通胀", "原油", "油价", "联邦基金"]
 
 
 def fetch_feed(pages: int = 4) -> list[str]:
@@ -49,6 +54,37 @@ def fetch_feed(pages: int = 4) -> list[str]:
             sys.stderr.write(f"page {p} 失败: {e}\n")
         time.sleep(0.8)
     return out
+
+
+def overseas_snapshot() -> str:
+    """隔夜海外关键行情一行文本（东财，1 次请求，多子域轮询）。
+
+    美联储决议/美股/美元/商品是 A 股开盘前最重要的外部输入。2026-09-17 美联储
+    2023-07 以来首次加息（+25bp 至 3.75%-4%、点阵图年内还要加），早盘简报却
+    一个字没提 —— 词表缺海外宏观词把 11 条相关快讯滤掉了大半。本函数提供
+    独立于快讯的硬数据。
+    注：新浪 int_dji 是陈旧值（46247 vs 实际 51461），美股/商品取东财。
+    """
+    labels = {"DJIA": "道指", "NDX": "纳指", "SPX": "标普500", "UDI": "美元指数",
+              "GC00Y": "纽约金", "CL00Y": "NYMEX原油"}
+    secids = "100.DJIA,100.NDX,100.SPX,100.UDI,101.GC00Y,102.CL00Y"
+    for host in ("82.push2.eastmoney.com", "push2delay.eastmoney.com", "push2.eastmoney.com"):
+        try:
+            url = (f"https://{host}/api/qt/ulist.np/get?secids={secids}"
+                   f"&fltt=2&invt=2&fields=f12,f2,f3")
+            req = urllib.request.Request(url, headers={"User-Agent": _UA})
+            d = json.loads(urllib.request.urlopen(req, timeout=12).read().decode("utf-8"))
+            rows = (d.get("data") or {}).get("diff") or []
+            parts = []
+            for r in rows:
+                nm = labels.get(str(r.get("f12")))
+                if nm and isinstance(r.get("f3"), (int, float)):
+                    parts.append(f"{nm} {r.get('f2')} ({r['f3']:+.2f}%)")
+            if parts:
+                return " | ".join(parts)
+        except Exception:  # noqa: BLE001 — 换下一个行情节点
+            continue
+    return ""
 
 
 def code_table() -> dict[str, str]:
@@ -366,14 +402,22 @@ def main() -> None:
         print("有效 A 股相关快讯不足，跳过简报")
         return
 
+    # 隔夜海外（美联储/美股/美元/商品）：A 股开盘前最重要的外部输入，独立于快讯。
+    # 2026-09-17 教训：美联储 2023 年 7 月以来首次加息当天，简报一个字没提。
+    os_text = overseas_snapshot()
+
     # 1) 方向 + 公司名（JSON，禁给代码）
-    sys1 = ("你是 A 股盘前情报分析助手。输入为快讯清单。输出 JSON：\n"
+    sys1 = ("你是 A 股盘前情报分析助手。输入为隔夜海外行情 + 快讯清单。输出 JSON：\n"
             "{\"directions\":[{\"topic\":\"方向一句话\",\"logic\":\"为什么影响A股\","
             "\"names\":[\"最直接受益的A股上市公司全名，3-5个，按受益度排序\"],"
             "\"signal\":\"什么出现说明催化落地\"}]}\n"
             "要求：只输出 JSON；names 必须是真实 A 股上市公司全名；"
-            "不确定的公司不要写；最多 3 个方向。")
-    d1 = complete_json("quick", sys1, "\n".join(f"- {t}" for t in items))
+            "不确定的公司不要写；最多 3 个方向。\n"
+            "若海外构成系统性风险（美联储加息/美债飙升/美元大涨/美股大跌），"
+            "必须把它作为第 1 个方向，并分别给出受损与受益板块。")
+    user1 = ((f"【隔夜海外】{os_text}\n\n" if os_text else "")
+             + "【A股快讯】\n" + "\n".join(f"- {t}" for t in items))
+    d1 = complete_json("quick", sys1, user1)
     dirs = d1.get("directions") or []
     if not dirs:
         print("LLM 未提炼出方向")
