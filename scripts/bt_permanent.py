@@ -48,6 +48,9 @@ def load_series() -> dict[str, dict[str, float]]:
         out: dict[str, dict[str, float]] = {}
         df = ak.stock_zh_index_daily(symbol="sh000300")
         out["stock"] = {str(r["date"])[:10]: float(r["close"]) for _, r in df.iterrows()}
+        # 上证红利：A 股高股息风格（我们选股逻辑的代表，2005 起完整）
+        df = ak.stock_zh_index_daily(symbol="sh000015")
+        out["stock_div"] = {str(r["date"])[:10]: float(r["close"]) for _, r in df.iterrows()}
         df = ak.bond_new_composite_index_cbond(indicator="财富", period="总值")
         out["bond"] = {str(r["date"])[:10]: float(r["value"]) for _, r in df.iterrows()}
         df = ak.spot_hist_sge(symbol="Au99.99")
@@ -77,8 +80,8 @@ def stats(nav: list[float], years: float) -> dict:
 def backtest(dates: list[str], series: dict[str, dict[str, float]],
              weights: dict[str, float], rebalance: bool = True) -> dict:
     """按权重回测；每年首个交易日再平衡。现金腿按固定年化复利。"""
-    nav = 1.0
-    units = {k: weights.get(k, 0.0) for k in ("stock", "bond", "gold")}
+    legs = [k for k in weights if k != "cash"]
+    units = {k: weights.get(k, 0.0) for k in legs}
     cash = weights.get("cash", 0.0)
     navs = [1.0]
     last_year = dates[0][:4]
@@ -86,24 +89,19 @@ def backtest(dates: list[str], series: dict[str, dict[str, float]],
         if i == 0:
             continue
         prev = dates[i - 1]
-        pnl = 0.0
-        # 各腿按价格变动
-        for k in ("stock", "bond", "gold"):
+        for k in legs:
             if units.get(k):
                 p0, p1 = series[k].get(prev), series[k].get(d)
                 if p0 and p1:
                     units[k] *= p1 / p0
-                    pnl += 1  # 只用于记录
         cash *= (1 + CASH_RATE) ** (1 / 252)
         total = sum(units.values()) + cash
         # 年度再平衡（当年首个交易日）
         if rebalance and d[:4] != last_year:
-            target = {k: total * weights.get(k, 0.0) for k in ("stock", "bond", "gold")}
-            units = target
+            units = {k: total * weights.get(k, 0.0) for k in legs}
             cash = total * weights.get("cash", 0.0)
             last_year = d[:4]
-        nav = sum(units.values()) + cash
-        navs.append(nav)
+        navs.append(sum(units.values()) + cash)
     return {"navs": navs}
 
 
@@ -115,16 +113,17 @@ def main() -> None:
         series = load_series()
         CACHE.parent.mkdir(parents=True, exist_ok=True)
         CACHE.write_text(json.dumps({"series": series}))
-    dates = sorted(set(series["stock"]) & set(series["bond"]) & set(series["gold"]))
+    dates = sorted(set(series["stock"]) & set(series["stock_div"])
+                   & set(series["bond"]) & set(series["gold"]))
     years = len(dates) / 252
     print(f"# A 股版永续组合回测（{dates[0]} ~ {dates[-1]}，{len(dates)} 个交易日 ≈ {years:.1f} 年）")
     print(f"# 腿：沪深300 / 中债总财富指数(含息) / 上金所Au99.99 / 现金 {CASH_RATE:.0%}；年度再平衡\n")
 
     combos = {
-        "100% 股票": {"stock": 1.0},
-        "60/40 股债": {"stock": 0.6, "bond": 0.4},
-        "永续 25×4": {"stock": 0.25, "bond": 0.25, "gold": 0.25, "cash": 0.25},
-        "永续变体 股35/债35/金15/现15": {"stock": 0.35, "bond": 0.35, "gold": 0.15, "cash": 0.15},
+        "100% 股票(沪深300)": {"stock": 1.0},
+        "100% 上证红利": {"stock_div": 1.0},
+        "永续 25×4(沪深300腿)": {"stock": 0.25, "bond": 0.25, "gold": 0.25, "cash": 0.25},
+        "永续 25×4(红利腿)": {"stock_div": 0.25, "bond": 0.25, "gold": 0.25, "cash": 0.25},
     }
     print("| 组合 | 年化 | 波动 | 夏普 | **最大回撤** |")
     print("|---|---|---|---|---|")
