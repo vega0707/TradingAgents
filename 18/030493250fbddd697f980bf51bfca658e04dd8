@@ -1,0 +1,22 @@
+scripts/bt_permanent.py
+  s_e83a5402cf255a::t_fe5afed4eb16cf 51-53,83-84,92,101,104,123-126
+  s_e83a5402cf255a::t_25d7a12a175d9b 116-117
+tradingagents/ashare/portfolio.py
+  s_e83a5402cf255a::t_2e39a5b6a6ead0 324-344
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.44-trip",
+  "base_commit_sha": "18030493250fbddd697f980bf51bfca658e04dd8",
+  "prompts": {},
+  "sessions": {
+    "s_e83a5402cf255a": {
+      "agent_id": {
+        "tool": "chengxiaobang",
+        "id": "s_pm1eoc8ugaw1",
+        "model": "auto(free)"
+      },
+      "human_author": "vega <jw_xiao@trip.com>"
+    }
+  }
+}
